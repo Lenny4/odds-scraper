@@ -10,12 +10,12 @@ export default class App {
         // nothing
     }
 
-    public async start() {
+    async start() {
         new OrbitxManager(this).start();
         new PolymarketManager(this).start();
     }
 
-    public async stop() {
+    async stop() {
         // todo
     }
 }

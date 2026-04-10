@@ -44,13 +44,13 @@ export default class OrbitxManager implements SupplierInterface {
         this.app = app;
     }
 
-    public async start() {
+    async start() {
         this.running = true;
         this.scrapEventTask = new ScrapEventTask();
         this.scrapEventTask.start!(this.sports);
     }
 
-    public async stop() {
+    async stop() {
         // todo
     }
 }

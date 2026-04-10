@@ -14,11 +14,11 @@ export default class PolymarketManager implements SupplierInterface {
         this.app = app;
     }
 
-    public async start() {
+    async start() {
         // todo
     }
 
-    public async stop() {
+    async stop() {
         // todo
     }
 }
