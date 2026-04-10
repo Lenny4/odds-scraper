@@ -24,6 +24,13 @@ export interface MarketInterface {
     event: EventInterface,
     runners: RunnerInterface[];
     marketRunners: MarketRunnerInterface[];
+    startRecord: number;
+    stopRecord: number | null;
+    inPlay: boolean;
+    status: MarketStatusEnum;
+    startTime: number;
+    totalMatched: number;
+    numberOfWinners: number;
 }
 
 export interface RunnerInterface {
