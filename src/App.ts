@@ -1,5 +1,8 @@
 'use strict';
 
+import OrbitxManager from "./Suppliers/Orbitx/OrbitxManager";
+import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
+
 export default class App {
 
 
@@ -8,6 +11,11 @@ export default class App {
     }
 
     public async start() {
+        new OrbitxManager(this).start();
+        new PolymarketManager(this).start();
+    }
+
+    public async stop() {
         // todo
     }
 }
