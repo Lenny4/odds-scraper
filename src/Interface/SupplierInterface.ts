@@ -10,9 +10,18 @@ export interface SupplierInterface {
     running: boolean;
 
     start(distance: number): Promise<void>;
+
     stop(): Promise<void>;
+
     canScrapMarket(apiMarket: any): boolean;
+
     marketToString(market: MarketInterface, encodeUri: boolean): string;
+
     getMarketIsFinish(market: MarketInterface): boolean;
+
     getMarketUrl(market: MarketInterface, encodeUri: boolean): string | null;
+
+    transformApiMarketToMarket(apiMarket: any): MarketInterface;
+
+    addMarket(market: MarketInterface): void;
 }

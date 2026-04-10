@@ -4,7 +4,7 @@ import puppeteer, {Browser, PuppeteerLaunchOptions} from 'puppeteer';
 import * as fs from "fs";
 import path from "path";
 
-class BrowserManager {
+export class BrowserManager {
     private static browser: Browser | null = null;
     private static refCount = 0;
     private static launchPromise: Promise<Browser> | null = null;

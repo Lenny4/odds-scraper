@@ -1,5 +1,8 @@
 'use strict';
 
+import {SportEnum} from "../Enum/SportEnum";
+import {MarketStatusEnum} from "../Enum/MarketEnum";
+
 export interface SportInterface {
     id: number | string;
     enum: SportEnum;
@@ -27,7 +30,7 @@ export interface MarketInterface {
     startRecord: number;
     stopRecord: number | null;
     inPlay: boolean;
-    status: MarketStatusEnum;
+    status: MarketStatusEnum | null;
     startTime: number;
     totalMatched: number;
     numberOfWinners: number;

@@ -1,6 +1,6 @@
 'use strict';
 
-enum SportEnum {
+export enum SportEnum {
     Soccer = "soccer",
     Tennis = "tennis",
     Cricket = "cricket",

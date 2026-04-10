@@ -1,5 +1,5 @@
 'use strict';
 
-enum MarketStatusEnum {
+export enum MarketStatusEnum {
     Closed = "closed",
 }
