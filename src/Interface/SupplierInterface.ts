@@ -7,6 +7,7 @@ export interface SupplierInterface {
     app: App;
     name: string;
     markets: MarketInterface[];
+    running: boolean;
 
     start(distance: number): Promise<void>;
     stop(): Promise<void>;

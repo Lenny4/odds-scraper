@@ -2,22 +2,28 @@
 
 export interface SportInterface {
     id: number | string;
-    name: string;
+    enum: SportEnum;
+    name?: string;
 }
 
 export interface CompetitionInterface {
     id: number | string;
     name: string;
+    sport: SportInterface;
 }
 
 export interface EventInterface {
     id: number | string;
     name: string;
+    competition: CompetitionInterface;
 }
 
 export interface MarketInterface {
     id: string | number;
     name: string | number;
+    event: EventInterface,
+    runners: RunnerInterface[];
+    marketRunners: MarketRunnerInterface[];
 }
 
 export interface RunnerInterface {
