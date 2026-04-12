@@ -6,6 +6,8 @@ import {SupplierInterface} from "../../Interface/SupplierInterface";
 import ScrapEventTask from "./ScrapEventTask";
 import {SupplierManager} from "../SupplierManager";
 import {SportEnum} from "../../Enum/SportEnum";
+import ScrapSocketTask from "./ScrapSocketTask";
+import {MarketStatusEnum} from "../../Enum/MarketEnum";
 
 export default class OrbitxManager extends SupplierManager implements SupplierInterface {
     static readonly url = 'https://orbitxch.com';
@@ -42,6 +44,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
         },
     ];
     scrapEventTask: ScrapEventTask | null = null;
+    scrapSocketTask: ScrapSocketTask | null = null;
     headers: any = null;
     connectedUntil: number | null = null;
 
@@ -73,6 +76,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                     }
                 }
             },
+            supplier: this.name,
             id: apiMarket.marketId,
             inPlay: apiMarket.inPlay,
             odds: [],
@@ -86,12 +90,15 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                 }
                 return runner;
             }),
-            startRecord: now,
+            created: now,
             startTime: apiMarket.marketStartTime,
             status: null,
-            stopRecord: null,
+            deleted: null,
             totalMatched: apiMarket.totalMatched,
             diffs: [],
+            modificationsOnMarket: [],
+            connections: [],
+            isSaving: false,
         };
         this.initMarketRunners(market);
         return market;
@@ -100,9 +107,14 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     async start() {
         this.running = true;
         this.scrapEventTask = new ScrapEventTask(this);
+        this.scrapSocketTask = new ScrapSocketTask(this);
     }
 
     async stop() {
         // todo
+    }
+
+    getStatus(status: string): MarketStatusEnum | null {
+        return null;
     }
 }

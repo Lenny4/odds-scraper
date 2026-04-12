@@ -2,6 +2,7 @@
 
 import {MarketInterface} from "./MarketInterface";
 import App from "../App";
+import {MarketStatusEnum} from "../Enum/MarketEnum";
 
 export interface SupplierInterface {
     app: App;
@@ -24,4 +25,8 @@ export interface SupplierInterface {
     transformApiMarketToMarket(apiMarket: any): MarketInterface;
 
     addMarket(market: MarketInterface): void;
+
+    getStatus(status: string): MarketStatusEnum | null;
+
+    removeMarkets(ids: (string | number)[], time: number): Promise<void>;
 }

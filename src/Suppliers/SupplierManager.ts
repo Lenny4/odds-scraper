@@ -18,7 +18,7 @@ export abstract class SupplierManager {
     }
 
     updateMarket(market: MarketInterface, newMarket: MarketInterface): void {
-        const excludeKeys = ['odds', 'marketRunners', 'diffs'];
+        const excludeKeys = ['odds', 'marketRunners', 'diffs', 'modificationsOnMarket'];
 
         const diffMarket = diff(market, newMarket, {excludeKeys});
         if (diffMarket) {
@@ -74,5 +74,30 @@ export abstract class SupplierManager {
             now + (15 * 60 * 1000) < market.startTime &&
             [2, 3].includes(market.runners.length)
         );
+    }
+
+    public async removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
+        const marketsToRemove = this.markets.filter(m => {
+            return marketIdsToRemove.includes(m.id) && !m.isSaving;
+        });
+        if (marketsToRemove.length === 0) {
+            return;
+        }
+        for (const market of marketsToRemove) {
+            // Set `isSaving` to `true` before any asynchronous operations to ensure
+            // that other processes calling this function will recognize these markets
+            // as already being processed, avoiding concurrent modifications.
+            market.isSaving = true;
+        }
+        for (const market of marketsToRemove) {
+            let filePath: string | null = null;
+            market.modificationsOnMarket = [];
+            market.deleted = time;
+            await this.app.mongoService!.saveMarket(market);
+            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+                console.info("Market added in Mongo and removed from this.markets", this.marketToString(market));
+            }
+        }
+        this.markets = this.markets.filter(m => !marketIdsToRemove.includes(m.id))
     }
 }

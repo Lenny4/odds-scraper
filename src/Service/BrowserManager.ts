@@ -1,6 +1,6 @@
 'use strict';
 
-import puppeteer, {Browser, PuppeteerLaunchOptions} from 'puppeteer';
+import puppeteer, {Browser, CDPSession, Page, PuppeteerLaunchOptions} from 'puppeteer';
 import * as fs from "fs";
 import path from "path";
 
@@ -116,4 +116,12 @@ export class BrowserManager {
             await BrowserManager.closePromise;
         }
     }
+
+    static async addCDPSession(page: Page): Promise<CDPSession> {
+        const cdp = await page!.createCDPSession();
+        await cdp.send('Network.enable');
+        await cdp.send('Page.enable');
+        return cdp;
+    }
+
 }

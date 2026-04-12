@@ -126,10 +126,11 @@ export default class ScrapEventTask {
             return;
         }
         this.isLoginIn = true;
+        let pageLogIn: Page | null = null;
         while (this.needToLoginAgain()) {
             try {
                 const browser = await BrowserManager.acquire('./cache/orbitx');
-                const pageLogIn = await browser.newPage();
+                pageLogIn = await browser.newPage();
                 this.addListeningHeaders(pageLogIn);
                 let isConnected = false;
                 const errorsMessages: string[] = [];
@@ -201,10 +202,15 @@ export default class ScrapEventTask {
                         DiscordService.send(message);
                     }
                 }
-                await pageLogIn.close();
             } catch (e) {
                 console.error(e);
             } finally {
+                try {
+                    await pageLogIn?.close();
+                } catch (e) {
+                    // nothing
+                }
+                pageLogIn = null;
                 await BrowserManager.release();
             }
         }
