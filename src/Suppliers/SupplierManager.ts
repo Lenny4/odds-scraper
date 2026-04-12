@@ -18,7 +18,7 @@ export abstract class SupplierManager {
     }
 
     updateMarket(market: MarketInterface, newMarket: MarketInterface): void {
-        const excludeKeys = ['odds', 'marketRunners', 'diffs', 'modificationsOnMarket'];
+        const excludeKeys = ['odds', 'marketRunners', 'diffs', 'modificationsOnMarket', 'connections'];
 
         const diffMarket = diff(market, newMarket, {excludeKeys});
         if (diffMarket) {
