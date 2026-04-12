@@ -14,7 +14,6 @@ export default class MongoService {
 
     constructor(app: App) {
         this.app = app;
-        this.start();
     }
 
     public async start() {
@@ -32,7 +31,6 @@ export default class MongoService {
             DiscordService.send(message);
             return;
         }
-        const now = Date.now();
         if (process.env.USE_MONGO === "1" || process.env.GET_SOFASCORE_RESULT === "1") {
             const nbAttempt = 3;
             for (let attempt = 0; attempt <= nbAttempt; attempt++) {
@@ -46,7 +44,7 @@ export default class MongoService {
                         !errorMessage.includes('Error: read ECONNRESET')
                     ) {
                         const message = "collection insertOne " + JSON.stringify({
-                            marketId: market.id,
+                            id: market.id,
                             error: errorMessage,
                         });
                         console.error(message);

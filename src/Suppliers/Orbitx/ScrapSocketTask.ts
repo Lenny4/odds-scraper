@@ -58,7 +58,7 @@ export default class ScrapSocketTask {
         return Math.ceil(this.orbitxManager.markets.length / Math.round(this.maxNbMarketPerSocket * this.ratioMarketPerSocket));
     }
 
-    private async handleMarkets(force: boolean = false, isRefreshSocket = false) {
+    public async handleMarkets(force: boolean = false, isRefreshSocket = false) {
         if (this.isHandlingMarket && !force) {
             if (!isRefreshSocket) {
                 this.needHandleMarket = true;
@@ -91,7 +91,7 @@ export default class ScrapSocketTask {
                     websocket: s.websocket?.readyState,
                     markets: s.markets.map((m) => {
                         return {
-                            marketId: m.id,
+                            id: m.id,
                         }
                     }),
                 }
@@ -102,7 +102,7 @@ export default class ScrapSocketTask {
                     websocket: s.websocket?.readyState,
                     markets: s.markets.map((m) => {
                         return {
-                            marketId: m.id,
+                            id: m.id,
                         }
                     }),
                 }
@@ -250,13 +250,14 @@ export default class ScrapSocketTask {
         const expectedNbSocketMarkets = this.getExpectedNbSocketMarkets();
         let alreadyAssigned = false;
         if (this.socketMarkets.length < expectedNbSocketMarkets) {
-            const browser = await BrowserManager.acquire('./cache/orbitx');
+            const browser = await BrowserManager.acquire(OrbitxManager.cache);
             for (let i = this.socketMarkets.length; i < expectedNbSocketMarkets; i++) {
                 const newSocketMarket = await this.createNewSocketMarket(browser);
                 this.socketMarkets.push(newSocketMarket);
                 this.assignMarketsToSocketMarkets();
                 alreadyAssigned = true;
             }
+            await BrowserManager.release();
         }
         if (this.socketMarkets.length > expectedNbSocketMarkets) {
             for (const [index, socketMarket] of this.socketMarkets.entries()) {
@@ -280,11 +281,12 @@ export default class ScrapSocketTask {
         );
         if (this.getExpectedNbSocketMarkets() === this.socketMarkets.filter(s => s.canListen).length) { // prioritize socketMarkets
             if (this.waitingSocketMarkets.length < expectedNbWaitingSocketMarkets) {
-                const browser = await BrowserManager.acquire('./cache/orbitx');
+                const browser = await BrowserManager.acquire(OrbitxManager.cache);
                 for (let i = this.waitingSocketMarkets.length; i < expectedNbWaitingSocketMarkets; i++) {
                     const newSocketMarket = await this.createNewSocketMarket(browser);
                     this.waitingSocketMarkets.push(newSocketMarket);
                 }
+                await BrowserManager.release();
             }
         }
         let nbToDelete = this.waitingSocketMarkets.length - expectedNbWaitingSocketMarkets;

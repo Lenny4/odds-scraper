@@ -13,7 +13,7 @@ export abstract class SupplierManager {
         this.app = app;
     }
 
-    addMarket(market: MarketInterface): void {
+    _addMarket(market: MarketInterface): void {
         this.markets.push(market);
     }
 
@@ -76,7 +76,7 @@ export abstract class SupplierManager {
         );
     }
 
-    async removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
+    async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
         const marketsToRemove = this.markets.filter(m => {
             return marketIdsToRemove.includes(m.id) && !m.isSaving;
         });

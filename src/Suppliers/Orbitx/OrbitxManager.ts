@@ -13,6 +13,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     static readonly url = 'https://orbitxch.com';
     static readonly timeToWaitBeforeWebSocketHandshakeResponseReceived: number = 10_000;
     static readonly reconnectRemainingTime: number = 30 * 60_000;
+    static readonly cache: string = './cache/orbitx';
     app!: App;
     name: string = "orbitx";
     markets: MarketInterface[] = [];
@@ -50,6 +51,16 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
 
     constructor(app: App) {
         super(app)
+    }
+
+    addMarket(market: MarketInterface): void {
+        this._addMarket(market);
+        this.scrapSocketTask?.handleMarkets();
+    }
+
+    async removeMarkets(ids: (string | number)[], time: number): Promise<void> {
+        await this._removeMarkets(ids, time);
+        this.scrapSocketTask?.handleMarkets();
     }
 
     getMarketUrl(market: MarketInterface, encodeUri: boolean = false): string {
@@ -99,6 +110,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
             modificationsOnMarket: [],
             connections: [],
             isSaving: false,
+            runnersMap: {},
         };
         this.initMarketRunners(market);
         return market;
@@ -115,6 +127,9 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     }
 
     getStatus(status: string): MarketStatusEnum | null {
+        if (status === "OPEN") {
+            return MarketStatusEnum.Open;
+        }
         return null;
     }
 }

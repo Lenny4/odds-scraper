@@ -129,7 +129,7 @@ export default class ScrapEventTask {
         let pageLogIn: Page | null = null;
         while (this.needToLoginAgain()) {
             try {
-                const browser = await BrowserManager.acquire('./cache/orbitx');
+                const browser = await BrowserManager.acquire(OrbitxManager.cache);
                 pageLogIn = await browser.newPage();
                 this.addListeningHeaders(pageLogIn);
                 let isConnected = false;
