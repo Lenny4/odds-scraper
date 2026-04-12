@@ -3,11 +3,20 @@
 import {SportEnum} from "../Enum/SportEnum";
 import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 import WebSocket from "ws";
+import {CompetitionEnum} from "../Enum/CompetitionEnum";
 
 export interface SportInterface {
     id: number | string;
     enum: SportEnum;
     name?: string;
+}
+
+export interface CompetitionMappingInterface {
+    enum: CompetitionEnum;
+    values: {
+        id: number | string;
+        supplier: string;
+    }[]
 }
 
 export interface CompetitionInterface {
@@ -25,6 +34,11 @@ export interface EventInterface {
 export interface DiffMarketInterface {
     time: number;
     value: any;
+}
+
+export interface MatchingMarketInterface {
+    market: MarketInterface,
+    score: number;
 }
 
 export interface MarketInterface {
@@ -73,15 +87,24 @@ export interface MarketRunnerInterface {
 export interface OddInterface {
     name: OddNameEnum; // odd value, odd volumes ...
     type?: OddTypeEnum; // BACK, LAY for odd VALUE, Volume for odd volumes
+    index?: number;
     nbValues: number;
     values: TimeValueInterface[];
-    index?: number;
 }
 
 export interface TimeValueInterface {
     i: number;
     t: number;
     v: number;
+}
+
+export interface GroupMarketInterface {
+    markets: MarketInterface[];
+}
+
+export interface RemoveGroupMarketInterface {
+    id: string | number;
+    supplier: string;
 }
 
 export interface TypeMappingInterface {

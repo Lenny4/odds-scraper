@@ -130,6 +130,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
         if (status === "OPEN") {
             return MarketStatusEnum.Open;
         }
+        console.error("getStatus unknown", status)
         return null;
     }
 }
