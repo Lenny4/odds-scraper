@@ -3,6 +3,7 @@
 import {MarketInterface} from "../Interface/MarketInterface";
 import App from "../App";
 import {MarketStatusEnum} from "../Enum/MarketEnum";
+import {diff} from "json-diff";
 
 export abstract class SupplierManager {
     app: App;
@@ -16,16 +17,34 @@ export abstract class SupplierManager {
         this.markets.push(market);
     }
 
+    updateMarket(market: MarketInterface, newMarket: MarketInterface): void {
+        const excludeKeys = ['odds', 'marketRunners', 'diffs'];
+
+        const diffMarket = diff(market, newMarket, {excludeKeys});
+        if (diffMarket) {
+            market.diffs.push({
+                time: Date.now(),
+                value: diffMarket,
+            });
+
+            for (const key in newMarket) {
+                if (excludeKeys.includes(key)) continue;
+                // @ts-ignore
+                market[key] = newMarket[key];
+            }
+        }
+    }
+
     initMarketRunners(market: MarketInterface) {
         market.marketRunners = market.runners.map(r => {
             return {
                 runnerId: r.id,
-                quotation: [],
+                odds: [],
             }
         })
     }
 
-    getMarketUrl(market: MarketInterface, encodeUri: boolean = false): string | null {
+    getMarketUrl(market: MarketInterface, encodeUri: boolean = false): string {
         return "";
     }
 

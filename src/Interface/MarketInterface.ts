@@ -21,11 +21,17 @@ export interface EventInterface {
     competition: CompetitionInterface;
 }
 
+export interface DiffMarketInterface {
+    time: number;
+    value: any;
+}
+
 export interface MarketInterface {
     id: string | number;
     name: string | number;
     event: EventInterface,
     runners: RunnerInterface[];
+    odds: OddInterface[];
     marketRunners: MarketRunnerInterface[];
     startRecord: number;
     stopRecord: number | null;
@@ -34,6 +40,7 @@ export interface MarketInterface {
     startTime: number;
     totalMatched: number;
     numberOfWinners: number;
+    diffs: DiffMarketInterface[];
 }
 
 export interface RunnerInterface {
@@ -43,10 +50,10 @@ export interface RunnerInterface {
 
 export interface MarketRunnerInterface {
     runnerId: RunnerInterface['id'];
-    quotation: QuotationInterface[];
+    odds: OddInterface[];
 }
 
-export interface QuotationInterface {
+export interface OddInterface {
     name: string; // BACK, LAY for odd VALUE, Volume for odd volumes
     type: string; // odd value, odd volumes ...
     values: TimeValueInterface[];
@@ -58,10 +65,10 @@ export interface TimeValueInterface {
     v: number;
 }
 
-export interface QuotationOddValueInterface extends QuotationInterface {
-    options?: QuotationOddValueOptionInterface;
+export interface OddOddValueInterface extends OddInterface {
+    options?: OddOddValueOptionInterface;
 }
 
-export interface QuotationOddValueOptionInterface extends QuotationInterface {
+export interface OddOddValueOptionInterface extends OddInterface {
     index: number;
 }

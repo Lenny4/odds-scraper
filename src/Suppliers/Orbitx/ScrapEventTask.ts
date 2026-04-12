@@ -322,7 +322,7 @@ export default class ScrapEventTask {
             return false;
         }
         if (market) {
-            const test = 0;
+            this.orbitxManager.updateMarket(market, newMarket);
         } else {
             if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
                 console.info("Add new market " + this.orbitxManager.marketToString(newMarket));

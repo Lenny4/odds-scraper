@@ -49,6 +49,14 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
         super(app)
     }
 
+    getMarketUrl(market: MarketInterface, encodeUri: boolean = false): string {
+        let url = OrbitxManager.url + '/customer/sport/' + market.event.competition.sport.id + '/market/' + market.id;
+        if (encodeUri) {
+            url = encodeURI(url);
+        }
+        return url;
+    }
+
     transformApiMarketToMarket(apiMarket: any): MarketInterface {
         const now = Date.now();
         const market: MarketInterface = {
@@ -67,6 +75,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
             },
             id: apiMarket.marketId,
             inPlay: apiMarket.inPlay,
+            odds: [],
             marketRunners: [],
             name: apiMarket.marketName,
             numberOfWinners: apiMarket.numberOfWinners,
@@ -82,6 +91,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
             status: null,
             stopRecord: null,
             totalMatched: apiMarket.totalMatched,
+            diffs: [],
         };
         this.initMarketRunners(market);
         return market;
