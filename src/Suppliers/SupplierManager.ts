@@ -1,8 +1,8 @@
 'use strict';
 
-import {MarketInterface} from "../Interface/MarketInterface";
+import {MarketInterface, OddInterface} from "../Interface/MarketInterface";
 import App from "../App";
-import {MarketStatusEnum} from "../Enum/MarketEnum";
+import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 import {diff} from "json-diff";
 
 export abstract class SupplierManager {
@@ -76,7 +76,7 @@ export abstract class SupplierManager {
         );
     }
 
-    public async removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
+    async removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
         const marketsToRemove = this.markets.filter(m => {
             return marketIdsToRemove.includes(m.id) && !m.isSaving;
         });
@@ -99,5 +99,30 @@ export abstract class SupplierManager {
             }
         }
         this.markets = this.markets.filter(m => !marketIdsToRemove.includes(m.id))
+    }
+
+    getOdd(odds: OddInterface[], name: OddNameEnum, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
+        let odd = odds.find(o => o.name === OddNameEnum.MarketVolume && o.type === type && o.index === index);
+        if (!odd) {
+            odd = {
+                type: type,
+                name: name,
+                nbValues: 0,
+                index: index,
+                values: [],
+            }
+            odds.push(odd);
+        }
+        return odd!;
+    }
+
+    addOddValue(odd: OddInterface, value: number, time: number) {
+        if (odd.values.length === 0 || odd.values[odd.values.length - 1].v !== value) {
+            odd.values.push({
+                i: odd.values.length + 1,
+                t: time,
+                v: value,
+            });
+        }
     }
 }

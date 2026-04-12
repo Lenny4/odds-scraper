@@ -1,8 +1,8 @@
 'use strict';
 
-import {MarketInterface} from "./MarketInterface";
+import {MarketInterface, OddInterface} from "./MarketInterface";
 import App from "../App";
-import {MarketStatusEnum} from "../Enum/MarketEnum";
+import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 
 export interface SupplierInterface {
     app: App;
@@ -29,4 +29,8 @@ export interface SupplierInterface {
     getStatus(status: string): MarketStatusEnum | null;
 
     removeMarkets(ids: (string | number)[], time: number): Promise<void>;
+
+    getOdd(odds: OddInterface[], name: OddNameEnum, type: OddTypeEnum | undefined, index: number | undefined): OddInterface;
+
+    addOddValue(odd: OddInterface, value: number, time: number): void;
 }

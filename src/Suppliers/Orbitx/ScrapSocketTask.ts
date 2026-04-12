@@ -1,7 +1,7 @@
 'use strict';
 
 import OrbitxManager from "./OrbitxManager";
-import {OddTypeEnum} from "../../Enum/MarketEnum";
+import {OddNameEnum, OddTypeEnum} from "../../Enum/MarketEnum";
 import WebSocket from "ws";
 import {Browser, Page} from "puppeteer";
 import {
@@ -28,10 +28,10 @@ export default class ScrapSocketTask {
     public isHandlingMarket: boolean = false;
     public needHandleMarket: boolean = false;
     public readonly timeoutOpenConnectionMessage: number = 1_000;
-    private types: TypeMappingInterface[] = [{prop: 'bdatb', value: OddTypeEnum.Back}, {
-        prop: 'bdatl',
-        value: OddTypeEnum.Lay
-    }];
+    private types: TypeMappingInterface[] = [
+        {prop: 'bdatb', value: OddTypeEnum.Back},
+        {prop: 'bdatl', value: OddTypeEnum.Lay}
+    ];
 
 
     public constructor(orbitxManager: OrbitxManager) {
@@ -457,33 +457,27 @@ export default class ScrapSocketTask {
             return;
         }
         market.modificationsOnMarket.push(now);
-        const newMarketVolume: MarketVolumeInterface = {
-            t: now,
-            v: Math.round(Number(data.tv)),
-        };
-        if (
-            market.marketVolumes.length === 0 ||
-            newMarketVolume.v !== market.marketVolumes[market.marketVolumes.length - 1].v
-        ) {
-            market.marketVolumes.push(newMarketVolume);
-            market.totalMatched = newMarketVolume.v;
-        }
+
+        const valueMarketVolume = Math.round(Number(data.tv));
+        const oddMarketVolume = this.orbitxManager.getOdd(market.odds, OddNameEnum.MarketVolume);
+        this.orbitxManager.addOddValue(oddMarketVolume, valueMarketVolume, now)
+        market.totalMatched = valueMarketVolume;
+
         if (!data.rc) { // something data.rc is not send by socket
-            this.app.liveTask?.onMarketChanged(market, askMarket); // always execute before return
             return;
         }
         for (const rc of data.rc) {
             if (!market.runnersMap.hasOwnProperty(rc.id)) {
-                const message = "market.runnersMap.hasOwnProperty(rc.id) marketId[" + App.marketToString(market) + "] rc.id[" + rc.id + "] market.runnersMap[" + JSON.stringify(market.runnersMap) + "]"
+                const message = "market.runnersMap.hasOwnProperty(rc.id) marketId[" + this.orbitxManager.marketToString(market) + "] rc.id[" + rc.id + "] market.runnersMap[" + JSON.stringify(market.runnersMap) + "]"
                 DiscordService.send(message);
                 throw message;
             }
-            let marketRunner = market.marketRunners.find(mr => mr.runner.selectionId === market.runnersMap[rc.id]);
+            let marketRunner = market.marketRunners.find(mr => mr.runnerId === market.runnersMap[rc.id]);
             if (!marketRunner) {
-                const runner = market.runners.find(r => r.selectionId === market.runnersMap[rc.id]);
+                const runner = market.runners.find(r => r.id === market.runnersMap[rc.id]);
                 if (runner) {
                     marketRunner = {
-                        runner: runner,
+                        runnerId: runner.id,
                         odds: [],
                     };
                     market.marketRunners.push(marketRunner);
@@ -495,57 +489,19 @@ export default class ScrapSocketTask {
             for (const type of this.types) {
                 // @ts-ignore
                 for (const bdat: BdatInterface of rc[type.prop]) {
-                    let odd = marketRunner.odds.find(o => o.index === bdat.index && o.type === type.value);
-                    if (!odd) {
-                        odd = {
-                            index: bdat.index,
-                            type: type.value,
-                            oddValues: [],
-                            oddVolumes: [],
-                        };
-                        marketRunner.odds.push(odd);
+                    const valueOddValue = Math.round(bdat.odds * 1000);
+                    if (valueOddValue > 1) {
+                        const oddRunnerOddValue = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, type.value, bdat.index);
+                        this.orbitxManager.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }
-                    const newOddValue = Math.round(bdat.odds * 1000);
-                    if (
-                        odd.oddValues.length === 0 ||
-                        (
-                            odd.oddValues[odd.oddValues.length - 1].v !== newOddValue &&
-                            newOddValue > 1
-                        )
-                    ) {
-                        odd.oddValues.push({
-                            t: now,
-                            v: newOddValue,
-                        });
-                        if (this.app.liveTask?.indexToSend.includes(odd.index)) {
-                            const askMarketRunner: AskMarketRunnerInterface | undefined = this.getCreateAskMarketRunner(askMarket, marketRunner);
-                            askMarketRunner?.askOdds.push({
-                                type: odd.type,
-                                index: odd.index,
-                                i: odd.oddValues.length - 1,
-                            });
-                        }
-                    }
-                    // const newOddVolume = RoundService.roundOddVolume(bdat.amount);
-                    const newOddVolume = Math.round(bdat.amount);
-                    if (
-                        odd.oddVolumes.length === 0 ||
-                        (
-                            odd.oddVolumes[odd.oddVolumes.length - 1].v !== newOddVolume &&
-                            newOddVolume > 0
-                        )
-                    ) {
-                        odd.oddVolumes.push({
-                            t: now,
-                            v: newOddVolume,
-                        });
+
+                    const valueOddVolume = Math.round(bdat.amount);
+                    if (valueOddVolume > 0) {
+                        const oddRunnerOddVolume = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, type.value, bdat.index);
+                        this.orbitxManager.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
                     }
                 }
             }
-        }
-        this.app.liveTask?.onMarketChanged(market, askMarket); // always execute before return
-        if (!market.piwiEvent) {
-            this.app.piwi247Task?.findBestEvent(market);
         }
     }
 

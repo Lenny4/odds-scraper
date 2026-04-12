@@ -1,7 +1,7 @@
 'use strict';
 
 import {SportEnum} from "../Enum/SportEnum";
-import {MarketStatusEnum, OddTypeEnum} from "../Enum/MarketEnum";
+import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 import WebSocket from "ws";
 
 export interface SportInterface {
@@ -71,24 +71,17 @@ export interface MarketRunnerInterface {
 }
 
 export interface OddInterface {
-    name: string; // odd value, odd volumes ...
-    type?: string; // BACK, LAY for odd VALUE, Volume for odd volumes
+    name: OddNameEnum; // odd value, odd volumes ...
+    type?: OddTypeEnum; // BACK, LAY for odd VALUE, Volume for odd volumes
+    nbValues: number;
     values: TimeValueInterface[];
-    options?: any;
+    index?: number;
 }
 
 export interface TimeValueInterface {
     i: number;
     t: number;
     v: number;
-}
-
-export interface OddOddValueInterface extends OddInterface {
-    options?: OddOddValueOptionInterface;
-}
-
-export interface OddOddValueOptionInterface extends OddInterface {
-    index: number;
 }
 
 export interface TypeMappingInterface {
