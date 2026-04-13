@@ -14,12 +14,16 @@ import {SupplierManager} from "./Suppliers/SupplierManager";
 import {CompetitionEnum} from "./Enum/CompetitionEnum";
 import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
 import stringSimilarity from "string-similarity";
+import LiveSocketService from "./Service/LiveSocketService";
 
 export default class App {
-    public mongoService: MongoService;
     public orbitxManager: OrbitxManager;
     public polymarketManager: PolymarketManager;
+
+    public mongoService: MongoService;
+    public liveSocketService: LiveSocketService;
     public dashboard: Dashboard;
+    public groupMarketId: number = 0;
     public groupMarkets: GroupMarketInterface[] = [];
     public competitionMapping: CompetitionMappingInterface[] = [
         {
@@ -43,6 +47,7 @@ export default class App {
         this.orbitxManager = new OrbitxManager(this);
         this.polymarketManager = new PolymarketManager(this);
         this.dashboard = new Dashboard(this);
+        this.liveSocketService = new LiveSocketService(this);
     }
 
     async start() {
@@ -50,6 +55,7 @@ export default class App {
         this.orbitxManager.start();
         this.polymarketManager.start();
         this.dashboard.start()
+        this.liveSocketService.start()
     }
 
     getCompetitionEnum(market: MarketInterface, supplier: string) {
@@ -60,31 +66,25 @@ export default class App {
     }
 
     addGroupMarket(market: MarketInterface) {
-        const competitionMapping = this.competitionMapping.find(c => c.enum === market.event.competition.enum);
-        if (!competitionMapping) {
-            return;
-        }
         for (const supplierManager of Object.values(this)) {
             if (!(supplierManager instanceof SupplierManager) || market.supplier === supplierManager.name) {
                 continue;
             }
             const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
-            if (markets.length === 0) {
-                return;
-            }
             const matchingMarket = this.findMatchingMarket(market, markets);
             if (matchingMarket) {
-                let groupMarket = this.groupMarkets.find(gm => gm.markets.find(m => m.id === matchingMarket.id));
+                const groupMarket = this.groupMarkets.find(gm => gm.markets.find(m => m.id === matchingMarket.id));
                 if (groupMarket) {
                     groupMarket.markets.push(market);
-                } else {
-                    this.groupMarkets.push({
-                        markets: [market, matchingMarket],
-                    })
+                    return;
                 }
             }
-            return;
         }
+        this.groupMarketId++;
+        this.groupMarkets.push({
+            id: this.groupMarketId,
+            markets: [market],
+        })
     }
 
     findMatchingMarket(market: MarketInterface, markets: MarketInterface[]): MarketInterface | null {

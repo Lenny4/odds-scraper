@@ -1,0 +1,140 @@
+'use strict';
+
+import App from "../App";
+import {createServer} from "node:http";
+import {Server, Socket} from "socket.io";
+import {
+    GroupMarketMessageInterface,
+    GroupMarketRequestInterface,
+    LiveMessageInterface,
+    MarketMessageInterface,
+    OddReceiveInterface,
+    OddRequestInterface
+} from "../Interface/LiveInterface";
+import {OddInterface} from "../Interface/MarketInterface";
+import {getValueByPath} from "./Utils";
+
+const clone = require('clone');
+
+export default class LiveSocketService {
+    public app: App;
+    private io?: Server;
+
+    constructor(app: App) {
+        this.app = app;
+    }
+
+    public async start() {
+        const PORT = Number(process.env.LIVE_PORT) || 4004;
+
+        const httpServer = createServer();
+        this.io = new Server(httpServer, {
+            cors: {
+                origin: false,
+            }
+        });
+        this.io.on("connection", (socket) => {
+            const token = socket.handshake.auth.token;
+            if (token !== process.env.TOKEN) {
+                console.error("❌ Invalid token, disconnecting...");
+                return socket.disconnect(true);
+            }
+
+            socket.on("message", (data: LiveMessageInterface) => {
+                if (data.type === 'groupMarkets') {
+                    socket.emit("message", this.groupMarketsMessage(data.value));
+                }
+                if (data.type === 'odds') {
+                    socket.emit("message", this.oddsMessage(data.value));
+                }
+                if (data.type === 'join') {
+                    this.joinRooms(socket, data.value);
+                }
+            });
+        });
+
+        httpServer.listen(PORT, '0.0.0.0', () => {
+            console.log(`Socket.IO server running on port ${PORT}`);
+        });
+    }
+
+    private groupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface): GroupMarketMessageInterface[] {
+        let groupMarkets = [...this.app.groupMarkets];
+        if (groupMarketRequest.groupMarketIds !== undefined) {
+            groupMarkets = groupMarkets.filter(gm => groupMarketRequest.groupMarketIds!.includes(gm.id));
+        }
+        return groupMarkets.map(gm => {
+            const groupMarketMessage: GroupMarketMessageInterface = {
+                id: gm.id,
+                markets: gm.markets.map(m => {
+                    const marketMessage: MarketMessageInterface = {
+                        id: m.id,
+                        event: m.event,
+                        marketRunners: m.marketRunners.map(mr => {
+                            return {
+                                ...mr,
+                                odds: [],
+                            }
+                        }),
+                        name: m.name,
+                        odds: [],
+                        runners: m.runners,
+                        supplier: m.supplier,
+                    }
+                    return marketMessage;
+                }),
+            };
+            return groupMarketMessage;
+        });
+    }
+
+    private oddsMessage(oddRequests: OddRequestInterface[]) {
+        const oddReceives: OddReceiveInterface[] = [];
+        for (const oddRequest of oddRequests) {
+            oddReceives.push({
+                ...oddRequest,
+                odds: this.getOdds(oddRequest),
+            })
+        }
+        return oddReceives;
+    }
+
+    private getOdds(oddRequest: OddRequestInterface): OddInterface[] | undefined {
+        const market = this.app.groupMarkets.find(gm => gm.id === oddRequest.groupMarketId)?.markets.find(m => m.supplier === oddRequest.supplier && m.id === oddRequest.marketId);
+        if (!market) {
+            return undefined;
+        }
+        let odds: OddInterface[] = getValueByPath(market, oddRequest.path);
+        odds = odds.filter(o =>
+            (o.name === oddRequest.name || oddRequest.name === undefined) &&
+            (o.type === oddRequest.type || oddRequest.type === undefined) &&
+            (o.index === oddRequest.index || oddRequest.index === undefined)
+        );
+        if (oddRequest.i !== undefined) {
+            for (const [index, value] of odds.entries()) {
+                odds[index] = clone(value);
+                odds[index].values = odds[index].values.filter(v => v.i >= oddRequest.i!)
+            }
+        }
+        return odds;
+    }
+
+    private joinRooms(socket: Socket, marketIds: string[]) {
+        const currentRooms = new Set(socket.rooms);
+        currentRooms.delete(socket.id); // Ignore private room
+
+        const roomsToLeave = [...currentRooms].filter(room => !marketIds.includes(room));
+        const roomsToJoin = marketIds.filter(room => !currentRooms.has(room));
+
+        // Leave rooms that are not in marketIds
+        for (const room of roomsToLeave) {
+            socket.leave(room);
+        }
+
+        // Join rooms that are not already joined
+        for (const room of roomsToJoin) {
+            socket.join(room);
+        }
+    }
+
+}
