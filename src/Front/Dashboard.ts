@@ -45,6 +45,19 @@ export default class Dashboard {
                     event: m.event,
                 }
             }) ?? [],
+            // groupMarkets: this.app.groupMarkets.map(gm => {
+            //     return {
+            //         markets: gm.markets.map(m => {
+            //             return {
+            //                 id: m.id,
+            //                 supplier: m.supplier,
+            //                 event: {
+            //                     name: m.event.name,
+            //                 }
+            //             }
+            //         })
+            //     }
+            // }),
             expectedNbSocketMarkets: this.app.orbitxManager.scrapSocketTask?.getExpectedNbSocketMarkets(),
             expectedNbWaitingSocketMarkets: this.app.orbitxManager.scrapSocketTask?.getExpectedNbWaitingSocketMarkets(),
             socketMarkets: this.app.orbitxManager.scrapSocketTask?.socketMarkets.map((s) => {

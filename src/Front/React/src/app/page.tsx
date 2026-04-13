@@ -153,10 +153,7 @@ export default function Home() {
     const filteredState = Object.fromEntries(
         Object.entries(state).filter(
             ([key, value]) => !Array.isArray(value) || [
-                'socketSports',
-                'sureBets',
-                'biggestDiff',
-                'pages',
+                'groupMarkets',
             ].includes(key)
         )
     );
