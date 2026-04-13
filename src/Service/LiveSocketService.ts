@@ -58,6 +58,16 @@ export default class LiveSocketService {
         });
     }
 
+    sendOddsMessage(oddRequests: OddRequestInterface[]) {
+        for (const oddRequest of oddRequests) {
+            this.io?.to(oddRequest.groupMarketId.toString()).emit("message", this.oddsMessage(oddRequests));
+        }
+    }
+
+    sendGroupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface) {
+        this.io?.sockets.emit("message", this.groupMarketsMessage(groupMarketRequest));
+    }
+
     private groupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface): GroupMarketMessageInterface[] {
         let groupMarkets = [...this.app.groupMarkets];
         if (groupMarketRequest.groupMarketIds !== undefined) {
@@ -119,12 +129,12 @@ export default class LiveSocketService {
         return odds;
     }
 
-    private joinRooms(socket: Socket, marketIds: string[]) {
+    private joinRooms(socket: Socket, groupMarketIds: string[]) {
         const currentRooms = new Set(socket.rooms);
         currentRooms.delete(socket.id); // Ignore private room
 
-        const roomsToLeave = [...currentRooms].filter(room => !marketIds.includes(room));
-        const roomsToJoin = marketIds.filter(room => !currentRooms.has(room));
+        const roomsToLeave = [...currentRooms].filter(room => !groupMarketIds.includes(room));
+        const roomsToJoin = groupMarketIds.filter(room => !currentRooms.has(room));
 
         // Leave rooms that are not in marketIds
         for (const room of roomsToLeave) {
