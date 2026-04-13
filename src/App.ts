@@ -65,7 +65,7 @@ export default class App {
             ))?.enum ?? null;
     }
 
-    addGroupMarket(market: MarketInterface) {
+    addGroupMarket(market: MarketInterface): GroupMarketInterface {
         for (const supplierManager of Object.values(this)) {
             if (!(supplierManager instanceof SupplierManager) || market.supplier === supplierManager.name) {
                 continue;
@@ -76,15 +76,17 @@ export default class App {
                 const groupMarket = this.groupMarkets.find(gm => gm.markets.find(m => m.id === matchingMarket.id));
                 if (groupMarket) {
                     groupMarket.markets.push(market);
-                    return;
+                    return groupMarket;
                 }
             }
         }
         this.groupMarketId++;
-        this.groupMarkets.push({
+        const groupMarket: GroupMarketInterface = {
             id: this.groupMarketId,
             markets: [market],
-        })
+        }
+        this.groupMarkets.push(groupMarket);
+        return groupMarket;
     }
 
     findMatchingMarket(market: MarketInterface, markets: MarketInterface[]): MarketInterface | null {

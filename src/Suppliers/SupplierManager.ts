@@ -19,7 +19,10 @@ export abstract class SupplierManager {
             console.info("Add new market " + this.marketToString(market));
         }
         this.markets.push(market);
-        this.app.addGroupMarket(market);
+        const groupMarket = this.app.addGroupMarket(market);
+        this.app.liveSocketService.sendGroupMarketsMessage({
+            groupMarketIds: [groupMarket.id],
+        })
     }
 
     updateMarket(market: MarketInterface, newMarket: MarketInterface): void {
