@@ -6,6 +6,7 @@ import WebSocket from "ws";
 import {Browser, Page} from "puppeteer";
 import {
     MarketInterface,
+    MarketRunnerInterface,
     RequestSocketMarketInterface,
     ResponseSocketMarketInterface,
     SocketMarketInterface,
@@ -469,24 +470,14 @@ export default class ScrapSocketTask {
             return;
         }
         for (const rc of data.rc) {
-            if (!market.runnersMap.hasOwnProperty(rc.id)) {
-                const message = "market.runnersMap.hasOwnProperty(rc.id) marketId[" + this.orbitxManager.marketToString(market) + "] rc.id[" + rc.id + "] market.runnersMap[" + JSON.stringify(market.runnersMap) + "]"
-                DiscordService.send(message);
-                throw message;
-            }
-            let marketRunner = market.marketRunners.find(mr => mr.runnerId === market.runnersMap[rc.id]);
-            if (!marketRunner) {
-                const runner = market.runners.find(r => r.id === market.runnersMap[rc.id]);
-                if (runner) {
-                    marketRunner = {
-                        runnerId: runner.id,
-                        odds: [],
-                    };
-                    market.marketRunners.push(marketRunner);
-                }
+            let marketRunner: MarketRunnerInterface | undefined = undefined;
+            if (market.runnersMap.hasOwnProperty(rc.id)) {
+                marketRunner = market.marketRunners.find(mr => mr.runnerId === market.runnersMap[rc.id]);
+            } else {
+                marketRunner = market.marketRunners.find(mr => mr.runnerId === rc.id);
             }
             if (!marketRunner) {
-                return;
+                throw "marketRunner not founded";
             }
             for (const type of this.types) {
                 // @ts-ignore

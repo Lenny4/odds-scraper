@@ -305,10 +305,7 @@ export default class ScrapEventTask {
                         }
                         const apiMarkets = await this.getAllMarketForEvent(apiMarket1.event.id);
                         for (const apiMarket2 of apiMarkets) {
-                            const newScrapSocketTaskCreated = this.addUpdateMarket(apiMarket2);
-                            if (newScrapSocketTaskCreated) {
-                                await new Promise(resolve => setTimeout(resolve, OrbitxManager.timeToWaitBeforeWebSocketHandshakeResponseReceived));
-                            }
+                            this.addUpdateMarket(apiMarket2);
                         }
                     }
                 } else {
@@ -320,22 +317,14 @@ export default class ScrapEventTask {
         } while (page < totalPage && this.orbitxManager.running);
     }
 
-    private addUpdateMarket(apiMarket: any): boolean {
-        let newScrapSocketTaskCreated = false;
+    private addUpdateMarket(apiMarket: any) {
         const newMarket = this.orbitxManager.transformApiMarketToMarket(apiMarket);
         let market = this.orbitxManager.markets.find(m => m.id === newMarket.id);
-        if (!(this.orbitxManager.canScrapMarket(newMarket) || market)) {
-            return false;
-        }
         if (market) {
             this.orbitxManager.updateMarket(market, newMarket);
-        } else {
-            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-                console.info("Add new market " + this.orbitxManager.marketToString(newMarket));
-            }
+        } else if (this.orbitxManager.canScrapMarket(newMarket)) {
             this.orbitxManager.addMarket(newMarket);
         }
-        return newScrapSocketTaskCreated;
     }
 
     private async getAllMarketForEvent(eventId: string): Promise<any[]> {

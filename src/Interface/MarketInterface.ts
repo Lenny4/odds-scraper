@@ -23,6 +23,7 @@ export interface CompetitionInterface {
     id: number | string;
     name: string;
     sport: SportInterface;
+    enum: CompetitionEnum | null;
 }
 
 export interface EventInterface {

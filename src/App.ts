@@ -36,6 +36,7 @@ export default class App {
             ]
         }
     ];
+    readonly liveCompetitions: CompetitionEnum[] = [CompetitionEnum.Nba];
 
     constructor() {
         this.mongoService = new MongoService(this);
@@ -51,8 +52,15 @@ export default class App {
         this.dashboard.start()
     }
 
+    getCompetitionEnum(market: MarketInterface, supplier: string) {
+        return this.competitionMapping.find(c =>
+            c.values.find(v =>
+                v.id === market.event.competition.id && v.supplier === supplier
+            ))?.enum ?? null;
+    }
+
     addGroupMarket(market: MarketInterface) {
-        const competitionMapping = this.competitionMapping.find(c => c.values.find(v => v.supplier === market.supplier && v.id === market.event.competition.id))
+        const competitionMapping = this.competitionMapping.find(c => c.enum === market.event.competition.enum);
         if (!competitionMapping) {
             return;
         }
@@ -60,7 +68,7 @@ export default class App {
             if (!(supplierManager instanceof SupplierManager) || market.supplier === supplierManager.name) {
                 continue;
             }
-            const markets = supplierManager.markets.filter(m => m.event.competition.id === market.event.competition.id);
+            const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
             if (markets.length === 0) {
                 return;
             }
@@ -82,29 +90,31 @@ export default class App {
     findMatchingMarket(market: MarketInterface, markets: MarketInterface[]): MarketInterface | null {
         let matchingMarket: MatchingMarketInterface | null = null;
         const runner1Names = market.runners.map(r => r.name);
+
         for (const m of markets) {
-            if (Math.abs(market.startTime - m.startTime) > 3600 * 1000) { // j'en ai vu au moins 1 avec 50 min de diff
-                return null;
+            if (Math.abs(market.startTime - m.startTime) > 3600 * 1000) {
+                continue;
             }
+
             const runner2Names = m.runners.map(r => r.name);
             let bestScore = 0;
             const permutations = this.permute(runner2Names);
+
             for (const perm of permutations) {
                 const score = runner1Names.reduce((sum, name, i) => {
-                    return sum + stringSimilarity.compareTwoStrings(name, perm[i] ?? '');
+                    return sum + this.compareRunnerNames(name, perm[i] ?? '');
                 }, 0) / runner1Names.length;
+
                 if (score > bestScore) bestScore = score;
             }
-            if (matchingMarket === null || bestScore > matchingMarket.score) {
-                matchingMarket = {
-                    market: m,
-                    score: bestScore,
-                }
-            }
 
+            if (matchingMarket === null || bestScore > matchingMarket.score) {
+                matchingMarket = {market: m, score: bestScore};
+            }
         }
+
         if (matchingMarket?.market && matchingMarket.score > 0.62) {
-            return matchingMarket?.market;
+            return matchingMarket.market;
         }
         return null;
     }
@@ -126,6 +136,20 @@ export default class App {
 
     async stop() {
         // todo
+    }
+
+    private compareRunnerNames(a: string, b: string): number {
+        const direct = stringSimilarity.compareTwoStrings(a.toLowerCase(), b.toLowerCase());
+
+        const wordsA = a.toLowerCase().split(/\s+/);
+        const wordsB = b.toLowerCase().split(/\s+/);
+
+        const wordScore = wordsB.reduce((sum, wb) => {
+            const best = Math.max(...wordsA.map(wa => stringSimilarity.compareTwoStrings(wa, wb)));
+            return sum + best;
+        }, 0) / wordsB.length;
+
+        return Math.max(direct, wordScore);
     }
 
     private permute(arr: string[]): string[][] {

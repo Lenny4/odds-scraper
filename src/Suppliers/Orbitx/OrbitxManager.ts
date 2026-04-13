@@ -11,39 +11,40 @@ import {MarketStatusEnum} from "../../Enum/MarketEnum";
 
 export default class OrbitxManager extends SupplierManager implements SupplierInterface {
     static readonly url = 'https://orbitxch.com';
-    static readonly timeToWaitBeforeWebSocketHandshakeResponseReceived: number = 10_000;
     static readonly reconnectRemainingTime: number = 30 * 60_000;
     static readonly cache: string = './cache/orbitx';
+    public static readonly timeToWaitBeforeWebSocketHandshakeResponseReceived: number = 10_000;
     app!: App;
-    name: string = "orbitx";
+    name: string = "OrbitxManager";
     markets: MarketInterface[] = [];
     running: boolean = false;
     readonly sports: SportInterface[] = [
-        {
-            id: "1",
-            enum: SportEnum.Soccer
-        },
-        {
-            id: "2",
-            enum: SportEnum.Tennis
-        },
-        {
-            id: "4",
-            enum: SportEnum.Cricket
-        },
-        {
-            id: "7511",
-            enum: SportEnum.Baseball,
-        },
+        // {
+        //     id: "1",
+        //     enum: SportEnum.Soccer
+        // },
+        // {
+        //     id: "2",
+        //     enum: SportEnum.Tennis
+        // },
+        // {
+        //     id: "4",
+        //     enum: SportEnum.Cricket
+        // },
+        // {
+        //     id: "7511",
+        //     enum: SportEnum.Baseball,
+        // },
         {
             id: "7522",
             enum: SportEnum.Basketball,
         },
-        {
-            id: "61420",
-            enum: SportEnum.AustralianRules,
-        },
+        // {
+        //     id: "61420",
+        //     enum: SportEnum.AustralianRules,
+        // },
     ];
+
     scrapEventTask: ScrapEventTask | null = null;
     scrapSocketTask: ScrapSocketTask | null = null;
     headers: any = null;
@@ -80,6 +81,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                 competition: {
                     id: apiMarket.competition.id,
                     name: apiMarket.competition.name,
+                    enum: null,
                     sport: {
                         id: apiMarket.eventType.id,
                         name: apiMarket.eventType.name,
@@ -112,7 +114,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
             isSaving: false,
             runnersMap: {},
         };
-        this.initMarketRunners(market);
+        this.initMarket(market, this.name);
         return market;
     }
 
@@ -126,11 +128,31 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
         // todo
     }
 
+    canScrapMarket(market: MarketInterface): boolean {
+        const now = Date.now();
+        return (
+            !this.getMarketIsFinish(market) &&
+            (
+                (
+                    (
+                        market.name === 'Match Odds' ||
+                        market.name === 'Moneyline'
+                    ) &&
+                    market.startTime - (2 * 3600 * 1000) < now
+                ) ||
+                market.totalMatched > 20_000 // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
+            ) &&
+            market.numberOfWinners === 1 &&
+            (now + (15 * 60 * 1000) < market.startTime || (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum))) &&
+            [2, 3].includes(market.runners.length)
+        );
+    }
+
     getStatus(status: string): MarketStatusEnum | null {
         if (status === "OPEN") {
             return MarketStatusEnum.Open;
         }
-        console.error("getStatus unknown", status)
+        console.error("getStatus OrbitxManager unknown", status)
         return null;
     }
 }

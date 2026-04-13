@@ -20,7 +20,7 @@ import DiscordService from "../../Service/DiscordService";
 export default class PolymarketManager extends SupplierManager implements SupplierInterface {
     static readonly url = 'https://gamma-api.polymarket.com';
     app!: App;
-    name: string = "polymarket";
+    name: string = "PolymarketManager";
     markets: MarketInterface[] = [];
     newMarkets: MarketInterface[] = [];
     running: boolean = false;
@@ -47,7 +47,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         await this.updateMarkets();
         setInterval(async () => {
             this.updateMarkets();
-        }, 3600 * 1000 * 24);
+        }, 3600 * 1000);
     }
 
     async updateMarkets() {
@@ -58,9 +58,20 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 await this.getMarkets(sport);
             }
         }
-        this.markets = [...this.newMarkets];
+        for (const newMarket of this.newMarkets) {
+            let market = this.markets.find(m => m.id === newMarket.id);
+            if (market) {
+                this.updateMarket(market, newMarket);
+            } else if (this.canScrapMarket(newMarket)) {
+                this.addMarket(newMarket);
+            }
+        }
         this.newMarkets = [];
         await this.connectMarkets();
+    }
+
+    canScrapMarket(market: MarketInterface): boolean {
+        return market.name === "moneyline";
     }
 
     transformApiMarketToMarket({
@@ -82,6 +93,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 competition: {
                     id: sport.series,
                     name: sport.sport,
+                    enum: null,
                     sport: {
                         id: "",
                         name: "",
@@ -114,7 +126,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             isSaving: false,
             clobTokenIds: JSON.parse(polymarketMarket.clobTokenIds),
         };
-        this.initMarketRunners(market);
+        this.initMarket(market, this.name);
         return market;
     }
 
@@ -123,7 +135,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     getStatus(status: string): MarketStatusEnum | null {
-        console.error("getStatus 2 unknown", status)
+        console.error("getStatus PolymarketManager unknown", status)
         return null;
     }
 
@@ -172,7 +184,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                         !this.ignoreMessage(result) &&
                         !this.handleMessageInitialDump(result)
                     ) {
-                        console.warn("new message", result);
+                        console.warn("new message 1", result);
                         DiscordService.send(JSON.stringify({
                             event: "no handle",
                             message: data,
@@ -185,7 +197,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 if (result === "PONG") {
                     return;
                 }
-                console.warn("new message", result)
+                console.warn("new message 2", result)
                 DiscordService.send(JSON.stringify({
                     event: "no handle",
                     message: data,
@@ -282,10 +294,14 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         const events = serie.events.filter(e => !e.closed && e.active);
         for (const e of events) {
             const event = await this.getEvent(e.id);
-            const polymarketMarket = event.markets.find(m => m.question === event.title)!;
-            this.newMarkets.push(this.transformApiMarketToMarket({
-                polymarketMarket: polymarketMarket, sport: sport, serie: serie, event: event
-            }));
+            for (const polymarketMarket of event.markets) {
+                const newMarket = this.transformApiMarketToMarket({
+                    polymarketMarket: polymarketMarket, sport: sport, serie: serie, event: event
+                });
+                if (this.canScrapMarket(newMarket)) {
+                    this.newMarkets.push(newMarket);
+                }
+            }
         }
     }
 

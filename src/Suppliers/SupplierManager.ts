@@ -15,6 +15,9 @@ export abstract class SupplierManager {
     }
 
     _addMarket(market: MarketInterface): void {
+        if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+            console.info("Add new market " + this.marketToString(market));
+        }
         this.markets.push(market);
         this.app.addGroupMarket(market);
     }
@@ -37,13 +40,14 @@ export abstract class SupplierManager {
         }
     }
 
-    initMarketRunners(market: MarketInterface) {
+    initMarket(market: MarketInterface, supplier: string) {
         market.marketRunners = market.runners.map(r => {
             return {
                 runnerId: r.id,
                 odds: [],
             }
-        })
+        });
+        market.event.competition.enum = this.app.getCompetitionEnum(market, supplier)
     }
 
     getMarketUrl(market: MarketInterface, encodeUri: boolean = false): string {
@@ -55,27 +59,13 @@ export abstract class SupplierManager {
     }
 
     getMarketIsFinish(market: MarketInterface): boolean {
-        return market.inPlay || market.status === MarketStatusEnum.Closed;
-    }
-
-    canScrapMarket(market: MarketInterface): boolean {
-        const now = Date.now();
-        return (
-            !this.getMarketIsFinish(market) &&
-            (
-                (
-                    (
-                        market.name === 'Match Odds' ||
-                        market.name === 'Moneyline'
-                    ) &&
-                    market.startTime - (2 * 3600 * 1000) < now
-                ) ||
-                market.totalMatched > 20_000 // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
-            ) &&
-            market.numberOfWinners === 1 &&
-            now + (15 * 60 * 1000) < market.startTime &&
-            [2, 3].includes(market.runners.length)
-        );
+        if (market.status === MarketStatusEnum.Closed) {
+            return true;
+        }
+        if (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum)) {
+            return false;
+        }
+        return market.inPlay ?? false;
     }
 
     async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
@@ -109,7 +99,7 @@ export abstract class SupplierManager {
     }
 
     getOdd(odds: OddInterface[], name: OddNameEnum, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
-        let odd = odds.find(o => o.name === OddNameEnum.MarketVolume && o.type === type && o.index === index);
+        let odd = odds.find(o => o.name === name && o.type === type && o.index === index);
         if (!odd) {
             odd = {
                 type: type,
