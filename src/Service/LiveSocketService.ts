@@ -30,7 +30,9 @@ export default class LiveSocketService {
         const httpServer = createServer();
         this.io = new Server(httpServer, {
             cors: {
-                origin: false,
+                origin: [
+                    "*",
+                ],
             }
         });
         this.io.on("connection", (socket) => {

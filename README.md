@@ -27,7 +27,7 @@ Si vous utilisez Ubuntu 22 ou une version plus récente, suivez ces étapes pour
 ```bash
 docker rm -v -f $(docker ps -a -q)
 xhost + && docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-./src/React/runc npm install [packageName]
+./src/Front/React/runc npm install [packageName]
 ```
 
 ### Lancer en mode production

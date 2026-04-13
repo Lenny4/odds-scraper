@@ -3,5 +3,5 @@
 if [ -z "$(docker compose ps -q node)" ]; then
     echo "Unable to connect to docker container. Have you run 'docker compose up -d'?"
 else
-    docker compose exec node sh -c "cd src/React && $*"
+    docker compose exec node sh -c "cd src/Front/React && $*"
 fi
