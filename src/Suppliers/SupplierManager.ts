@@ -132,4 +132,12 @@ export abstract class SupplierManager {
             });
         }
     }
+
+    addMarket(market: MarketInterface): void {
+        this._addMarket(market);
+    }
+
+    async removeMarkets(ids: (string | number)[], time: number): Promise<void> {
+        await this._removeMarkets(ids, time);
+    }
 }

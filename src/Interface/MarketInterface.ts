@@ -51,7 +51,7 @@ export interface MarketInterface {
     marketRunners: MarketRunnerInterface[];
     created: number;
     deleted: number | null;
-    inPlay: boolean;
+    inPlay: boolean | null;
     status: MarketStatusEnum | null;
     startTime: number;
     totalMatched: number;
@@ -59,8 +59,10 @@ export interface MarketInterface {
     diffs: DiffMarketInterface[];
     modificationsOnMarket: number[];
     connections: MarketConnectionInterface[];
-    runnersMap?: any;
     isSaving: boolean;
+
+    runnersMap?: any;
+    clobTokenIds?: string[];
 }
 
 export interface MarketConnectionInterface {

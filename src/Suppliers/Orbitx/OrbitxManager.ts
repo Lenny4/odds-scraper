@@ -102,7 +102,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                 return runner;
             }),
             created: now,
-            startTime: apiMarket.marketStartTime,
+            startTime: (new Date(apiMarket.marketStartTime)).getTime(),
             status: null,
             deleted: null,
             totalMatched: apiMarket.totalMatched,
