@@ -1,4 +1,4 @@
-https://ec2-3-238-225-97.compute-1.amazonaws.com {
+https://superpower-betting-exchange.com {
     reverse_proxy node:{$NODE_PORT:4004} {
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
