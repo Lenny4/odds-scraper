@@ -1,0 +1,9 @@
+http://socket.orbitxch.com {
+    reverse_proxy node:{$NODE_PORT:4004} {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up Host {host}
+    }
+    encode gzip
+}

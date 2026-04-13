@@ -19,6 +19,24 @@ services:
         published: ${SOCKET_PORT:-4002}
       - target: ${LIVE_PORT:-4004}
         published: ${LIVE_PORT:-4004}
+    networks:
+      - socket
+
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./certs:/data/caddy
+    networks:
+      - socket
+
+networks:
+  socket:
 
 #  flaresolverr:
 #    image: ghcr.io/flaresolverr/flaresolverr:latest
