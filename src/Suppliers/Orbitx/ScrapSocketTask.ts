@@ -456,7 +456,6 @@ export default class ScrapSocketTask {
         }
         if (this.orbitxManager!.getMarketIsFinish(market)) {
             await this.orbitxManager!.removeMarkets([market.id], now);
-            await this.handleMarkets();
             return;
         }
         market.modificationsOnMarket.push(now);

@@ -121,9 +121,9 @@ export default class LiveSocketService {
             (o.index === oddRequest.index || oddRequest.index === undefined)
         );
         if (oddRequest.i !== undefined) {
-            for (const [index, value] of odds.entries()) {
-                odds[index] = clone(value);
-                odds[index].values = odds[index].values.filter(v => v.i >= oddRequest.i!)
+            for (const [index, odd] of odds.entries()) {
+                odds[index] = clone(odd);
+                odds[index].values = odd.values.filter(o => o.i >= oddRequest.i!)
             }
         }
         return odds;
