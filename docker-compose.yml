@@ -22,18 +22,18 @@ services:
     networks:
       - socket
 
-  caddy:
-    image: caddy:2
-    container_name: caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ./certs:/data/caddy
-    networks:
-      - socket
+#  caddy:
+#    image: caddy:2
+#    container_name: caddy
+#    restart: unless-stopped
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+#      - ./certs:/data/caddy
+#    networks:
+#      - socket
 
 networks:
   socket:
