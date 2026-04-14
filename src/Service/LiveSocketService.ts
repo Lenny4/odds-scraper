@@ -27,8 +27,12 @@ export default class LiveSocketService {
     public async start() {
         const PORT = Number(process.env.LIVE_PORT) || 4004;
 
-        const httpServer = createServer();
+        const httpServer = createServer((req, res) => {
+            res.writeHead(200);
+            res.end("ok");
+        });
         this.io = new Server(httpServer, {
+            transports: ["websocket"],
             cors: {
                 origin: [
                     "*",
