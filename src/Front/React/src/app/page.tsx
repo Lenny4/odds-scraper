@@ -2,8 +2,9 @@
 
 import {useEffect, useState} from "react";
 import {io} from "socket.io-client";
-import {Typography} from "@mui/material";
-import {DetailAppInterface} from "../../../../Interface/AppInterface";
+import {Accordion, AccordionDetails, AccordionSummary, Typography} from "@mui/material";
+import {DetailAppInterface, GroupMarketDetailInterface} from "../../../../Interface/AppInterface";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 type JsonProps = {
     json: unknown;
@@ -39,8 +40,23 @@ function PreJson({json}: JsonProps) {
     );
 }
 
+function GroupMarket({groupMarket}: { groupMarket: GroupMarketDetailInterface }) {
+    return (
+        <div>
+            display chart
+        </div>
+    );
+}
+
 export default function Home() {
     const [detailApp, setDetailApp] = useState<DetailAppInterface | undefined>(undefined)
+    const [openGroupMarkets, setOpenGroupMarkets] = useState<number[]>([])
+
+    const handleChange = (id: number) => {
+        setOpenGroupMarkets(prev =>
+            prev.includes(id) ? prev.filter(gmId => gmId !== id) : [...prev, id]
+        );
+    };
 
     useEffect(() => {
         const socket = io('http://' + window.location.hostname + ':4002');
@@ -53,6 +69,7 @@ export default function Home() {
         });
         socket.on('disconnect', () => {
             console.log('disconnected');
+            setDetailApp(undefined);
         });
         return () => {
             socket.disconnect();
@@ -69,7 +86,28 @@ export default function Home() {
 
     return (
         <main>
-            <PreJson json={detailApp}/>
+            {detailApp.groupMarkets.sort((a, b) => {
+                return b.markets.length - a.markets.length;
+            }).map(gm => {
+                const market = gm.markets[0];
+                const suppliers = gm.markets.map(m => m.supplier);
+                return (
+                    <Accordion
+                        key={gm.id}
+                        expanded={openGroupMarkets.includes(gm.id)}
+                        onChange={() => handleChange(gm.id)}
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon/>}>
+                            <Typography component="span">
+                                {`${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)}`}
+                            </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            {openGroupMarkets.includes(gm.id) && <GroupMarket groupMarket={gm}/>}
+                        </AccordionDetails>
+                    </Accordion>
+                )
+            })}
         </main>
     );
 }
