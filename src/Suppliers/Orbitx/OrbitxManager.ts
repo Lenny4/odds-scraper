@@ -140,7 +140,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                         market.name === 'Match Odds' ||
                         market.name === 'Moneyline'
                     ) &&
-                    market.startTime - (2 * 3600 * 1000) < now
+                    (market.startTime - (2 * 3600 * 1000) < now || liveCompetitions)
                 ) ||
                 (market.totalMatched > 20_000 || liveCompetitions) // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
             ) &&
