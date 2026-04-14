@@ -17,7 +17,7 @@ export default class Dashboard {
                 origin: "*",  // adjust this for security in production
             }
         });
-        console.log(`FrontTask Socket.IO server running on port ${port}`);
+        console.log(`Dashboard server running on port ${port}`);
 
         io.on('connection', (socket) => {
             console.log('Client connected:', socket.id);

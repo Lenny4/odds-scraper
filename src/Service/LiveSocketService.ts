@@ -36,12 +36,6 @@ export default class LiveSocketService {
             }
         });
         this.io.on("connection", (socket) => {
-            const token = socket.handshake.auth.token;
-            if (token !== process.env.TOKEN) {
-                console.error("❌ Invalid token, disconnecting...");
-                return socket.disconnect(true);
-            }
-
             socket.on("message", (data: LiveMessageInterface) => {
                 if (data.type === 'groupMarkets') {
                     socket.emit("message", this.groupMarketsMessage(data.value));
@@ -56,7 +50,7 @@ export default class LiveSocketService {
         });
 
         httpServer.listen(PORT, '0.0.0.0', () => {
-            console.log(`Socket.IO server running on port ${PORT}`);
+            console.log(`LiveSocketService server running on port ${PORT}`);
         });
     }
 
