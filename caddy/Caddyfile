@@ -1,20 +1,9 @@
 https://superpower-betting-exchange.com {
-    handle /socket.io/* {
-                            reverse_proxy node:{$NODE_PORT:4004} {
-                                                                     transport http {
-                                                                                        versions 1.1
-                                                                                    }
-                                                                     header_up Connection {http.request.header.Connection}
-                                                                     header_up Upgrade {http.request.header.Upgrade}
-                                                                 }
-                        }
-    handle {
-               reverse_proxy node:{$NODE_PORT:4004} {
-                                                        header_up X-Forwarded-For {remote_host}
-                                                        header_up X-Forwarded-Proto {scheme}
-                                                        header_up X-Forwarded-Host {host}
-                                                        header_up Host {host}
-                                                    }
-               encode gzip
-           }
+    reverse_proxy node:{$NODE_PORT:4003} {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up Host {host}
+    }
+    encode gzip
 }
