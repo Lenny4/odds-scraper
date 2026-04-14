@@ -1,6 +1,11 @@
 'use strict';
 
-import {MarketInterface, OddInterface, RemoveGroupMarketInterface} from "../Interface/MarketInterface";
+import {
+    MarketInterface,
+    OddInterface,
+    RemoveGroupMarketInterface,
+    SocketMarketInterface
+} from "../Interface/MarketInterface";
 import App from "../App";
 import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 import {diff} from "json-diff";
@@ -9,6 +14,7 @@ export abstract class SupplierManager {
     app: App;
     markets: MarketInterface[] = [];
     name: string = "";
+    socketMarkets: SocketMarketInterface[] = [];
 
     constructor(app: App) {
         this.app = app;
@@ -42,6 +48,14 @@ export abstract class SupplierManager {
             }
         }
     }
+
+    removeModificationsOnMarkets(markets: MarketInterface[]): void {
+        const now = Date.now();
+        for (const market of this.markets) {
+            market.modificationsOnMarket = market.modificationsOnMarket?.filter(n => n > now - App.checkMarketModificationOnLast) ?? [];
+        }
+    }
+
 
     initMarket(market: MarketInterface, supplier: string) {
         market.marketRunners = market.runners.map(r => {

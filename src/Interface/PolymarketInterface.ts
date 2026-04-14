@@ -1,7 +1,4 @@
 'use strict';
-import WebSocket from "ws";
-
-import {MarketInterface} from "./MarketInterface";
 
 export interface PolymarketSportInterface {
     id: number;
@@ -38,11 +35,4 @@ export interface PolymarketEventInterface {
     id: string;
     title: string;
     markets: any[];
-}
-
-export interface PolymarketSocketInterface {
-    open: number | null;
-    websocket: WebSocket;
-    markets: MarketInterface[];
-    pingInterval: NodeJS.Timeout | null;
 }

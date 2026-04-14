@@ -1,6 +1,6 @@
 'use strict';
 
-import {MarketInterface, OddInterface} from "./MarketInterface";
+import {MarketInterface, OddInterface, SocketMarketInterface} from "./MarketInterface";
 import App from "../App";
 import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 
@@ -9,6 +9,7 @@ export interface SupplierInterface {
     name: string;
     markets: MarketInterface[];
     running: boolean;
+    socketMarkets: SocketMarketInterface[];
 
     start(distance: number): Promise<void>;
 

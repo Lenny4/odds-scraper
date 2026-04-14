@@ -1,6 +1,11 @@
 'use strict';
 
-import {MarketInterface, RunnerInterface, TypeMappingInterface} from "../../Interface/MarketInterface";
+import {
+    MarketInterface,
+    RunnerInterface,
+    SocketMarketInterface,
+    TypeMappingInterface
+} from "../../Interface/MarketInterface";
 import App from "../../App";
 import {SupplierInterface} from "../../Interface/SupplierInterface";
 import {SupplierManager} from "../SupplierManager";
@@ -10,7 +15,6 @@ import {
     PolymarketEventInterface,
     PolymarketInitialDumpInterface,
     PolymarketSeriesInterface,
-    PolymarketSocketInterface,
     PolymarketSportInterface
 } from "../../Interface/PolymarketInterface";
 import {clearInterval} from "node:timers";
@@ -23,10 +27,11 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     name: string = "PolymarketManager";
     markets: MarketInterface[] = [];
     newMarkets: MarketInterface[] = [];
+    socketMarketId: number = 0;
+    socketMarkets: SocketMarketInterface[] = [];
     running: boolean = false;
     sports: PolymarketSportInterface[] = [];
     readonly sportSlugs: string[] = ["nba"];
-    polymarketSocket: PolymarketSocketInterface | null = null;
     public types: TypeMappingInterface[] = [
         {
             prop: "ask",
@@ -141,28 +146,38 @@ export default class PolymarketManager extends SupplierManager implements Suppli
 
     private async connectMarkets() {
         if (this.markets.length === 0) {
-            if (
-                this.polymarketSocket?.websocket &&
-                (this.polymarketSocket.websocket.readyState === WebSocket.CONNECTING || this.polymarketSocket.websocket.readyState === WebSocket.OPEN)
-            ) {
-                this.polymarketSocket.websocket.close();
+            for (const socketMarket of this.socketMarkets) {
+                if (
+                    socketMarket?.websocket &&
+                    (socketMarket.websocket.readyState === WebSocket.CONNECTING || socketMarket.websocket.readyState === WebSocket.OPEN)
+                ) {
+                    socketMarket.websocket.close();
+                }
             }
-            this.polymarketSocket = null;
-        } else if (this.polymarketSocket === null) {
-            this.polymarketSocket = {
-                open: null,
-                websocket: new WebSocket("wss://ws-subscriptions-clob.polymarket.com/ws/market", {}),
+            this.socketMarkets = [];
+        } else if (this.socketMarkets.length === 0) {
+            this.socketMarketId++;
+            const socketMarket: SocketMarketInterface = {
+                id: this.socketMarketId,
                 markets: [],
                 pingInterval: null,
-            }
-            this.polymarketSocket.websocket.on('open', async () => {
-                this.polymarketSocket!.open = Date.now();
+                closing: false,
+                nbModificationsOnMarkets: 0,
+                canListen: true,
+                websocket: new WebSocket("wss://ws-subscriptions-clob.polymarket.com/ws/market", {}),
+                open: null,
+                lastReceivedMessage: undefined,
+                oldMarketIds: [],
+            };
+            this.socketMarkets.push(socketMarket)
+            socketMarket.websocket!.on('open', async () => {
+                socketMarket!.open = Date.now();
                 await this.sendMarkets();
-                this.polymarketSocket!.pingInterval = setInterval(async () => {
-                    this.polymarketSocket!.websocket.send("PING");
+                socketMarket!.pingInterval = setInterval(async () => {
+                    socketMarket!.websocket!.send("PING");
                 }, 10_000);
             });
-            this.polymarketSocket.websocket.on('error', (e) => {
+            socketMarket.websocket!.on('error', (e) => {
                 console.error("[PolymarketTask] websocket on error", e);
                 DiscordService.send(JSON.stringify({
                     event: "websocket.on('error' connectMarkets",
@@ -170,14 +185,15 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                     message: e.message,
                 }))
             });
-            this.polymarketSocket.websocket.on('close', () => { // each time error is called -> close is also call
-                if (this.polymarketSocket!.pingInterval) {
-                    clearInterval(this.polymarketSocket!.pingInterval);
+            socketMarket.websocket!.on('close', () => { // each time error is called -> close is also call
+                if (socketMarket!.pingInterval) {
+                    clearInterval(socketMarket!.pingInterval);
                 }
                 this.connectMarkets();
             });
-            this.polymarketSocket.websocket.on('message', (data: Buffer) => {
+            socketMarket.websocket!.on('message', (data: Buffer) => {
                 let result: any = data.toString();
+                socketMarket.lastReceivedMessage = Date.now();
                 try {
                     result = JSON.parse(result);
                     if (
@@ -190,6 +206,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                             message: data,
                         }));
                     }
+                    this.removeModificationsOnMarkets(this.markets);
                     return;
                 } catch (e) {
                     // nothing
@@ -233,6 +250,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         }
         for (const initialDump of initialDumps) {
             const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
+            market.modificationsOnMarket.push(now);
             const marketRunner = market.marketRunners.find(mr => mr.runnerId === initialDump.asset_id)!;
             for (const type of this.types) {
                 // @ts-ignore
@@ -258,34 +276,36 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     private async sendMarkets() {
-        if (this.polymarketSocket!.markets.length === 0) {
-            this.polymarketSocket!.websocket.send(JSON.stringify({
-                "assets_ids": this.markets.flatMap(m => m.clobTokenIds),
-                "type": "market",
-                "initial_dump": true,
-                "level": 2,
-                "custom_feature_enabled": false
-            }));
-        } else {
-            const listeningAssets: string[] = this.polymarketSocket!.markets.flatMap(m => m.clobTokenIds!);
-            const assets: string[] = this.markets.flatMap(m => m.clobTokenIds!);
-            const assetsToRemove = listeningAssets.filter(id => !assets.includes(id));
-            const assetToAdd = assets.filter(id => !listeningAssets.includes(id));
-
-            if (assetsToRemove.length > 0) {
-                this.polymarketSocket!.websocket.send(JSON.stringify({
-                    "operation": "unsubscribe",
-                    "assets_ids": assetsToRemove,
+        for (const socketMarket of this.socketMarkets) {
+            if (socketMarket!.markets.length === 0) {
+                socketMarket!.websocket!.send(JSON.stringify({
+                    "assets_ids": this.markets.flatMap(m => m.clobTokenIds),
+                    "type": "market",
+                    "initial_dump": true,
+                    "level": 2,
+                    "custom_feature_enabled": false
                 }));
-            }
+            } else {
+                const listeningAssets: string[] = socketMarket.markets.flatMap(m => m.clobTokenIds!);
+                const assets: string[] = this.markets.flatMap(m => m.clobTokenIds!);
+                const assetsToRemove = listeningAssets.filter(id => !assets.includes(id));
+                const assetToAdd = assets.filter(id => !listeningAssets.includes(id));
 
-            if (assetToAdd.length > 0) {
-                this.polymarketSocket!.websocket.send(JSON.stringify({
-                    "operation": "subscribe",
-                    "assets_ids": assetToAdd,
-                }));
-            }
+                if (assetsToRemove.length > 0) {
+                    socketMarket!.websocket!.send(JSON.stringify({
+                        "operation": "unsubscribe",
+                        "assets_ids": assetsToRemove,
+                    }));
+                }
 
+                if (assetToAdd.length > 0) {
+                    socketMarket!.websocket!.send(JSON.stringify({
+                        "operation": "subscribe",
+                        "assets_ids": assetToAdd,
+                    }));
+                }
+            }
+            socketMarket.markets = this.markets;
         }
     }
 

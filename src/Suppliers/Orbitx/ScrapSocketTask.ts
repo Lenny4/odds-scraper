@@ -18,17 +18,15 @@ import {diff} from "json-diff";
 
 export default class ScrapSocketTask {
     orbitxManager: OrbitxManager;
-    public maxNbMarketPerSocket: number = 15; // todo censé être récupéré dans le header [sec-websocket-extensions: permessage-deflate;client_max_window_bits=15], à implémenter dans PuppeteerService.createWebsocket
-    public ratioMarketPerSocket: number = 2 / 3;
-    public ratioWaitingSocketMarket: number = 1; // percentage de socketMarkets sans markets (en attente)
-    public maxWaitingSocketMarket: number = 8;
-    public socketMarkets: SocketMarketInterface[] = [];
-    public waitingSocketMarkets: SocketMarketInterface[] = [];
-    public checkMarketModificationOnLast: number = 5 * 60_000;
-    public id: number = 0;
-    public isHandlingMarket: boolean = false;
-    public needHandleMarket: boolean = false;
-    public readonly timeoutOpenConnectionMessage: number = 1_000;
+    maxNbMarketPerSocket: number = 15; // todo censé être récupéré dans le header [sec-websocket-extensions: permessage-deflate;client_max_window_bits=15], à implémenter dans PuppeteerService.createWebsocket
+    ratioMarketPerSocket: number = 2 / 3;
+    ratioWaitingSocketMarket: number = 1; // percentage de socketMarkets sans markets (en attente)
+    maxWaitingSocketMarket: number = 8;
+    waitingSocketMarkets: SocketMarketInterface[] = [];
+    id: number = 0;
+    isHandlingMarket: boolean = false;
+    needHandleMarket: boolean = false;
+    readonly timeoutOpenConnectionMessage: number = 1_000;
     private types: TypeMappingInterface[] = [
         {prop: 'bdatb', value: OddTypeEnum.Back},
         {prop: 'bdatl', value: OddTypeEnum.Lay}
@@ -86,7 +84,7 @@ export default class ScrapSocketTask {
 
     private getLogSocketMarketsState() {
         return JSON.stringify({
-            socketMarkets: this.socketMarkets.map((s) => {
+            socketMarkets: this.orbitxManager.socketMarkets.map((s) => {
                 return {
                     ...s,
                     websocket: s.websocket?.readyState,
@@ -114,7 +112,7 @@ export default class ScrapSocketTask {
     private assignMarketsToSocketMarkets(): (string | number)[] {
         const now = Date.now();
         const assignedMarkets: (string | number)[] = [];
-        for (const socketMarket of this.socketMarkets) {
+        for (const socketMarket of this.orbitxManager.socketMarkets) {
             socketMarket.oldMarketIds = socketMarket.markets.map(m => m.id);
             socketMarket.markets = [];
             socketMarket.nbModificationsOnMarkets = 0;
@@ -128,8 +126,8 @@ export default class ScrapSocketTask {
                 return r;
             });
         }
+        this.orbitxManager.removeModificationsOnMarkets(this.orbitxManager.markets);
         for (const market of this.orbitxManager.markets) {
-            market.modificationsOnMarket = market.modificationsOnMarket?.filter(n => n > now - this.checkMarketModificationOnLast) ?? [];
             const socketMarket = this.getBestSocketMarket(market);
             if (socketMarket) {
                 assignedMarkets.push(market.id);
@@ -137,14 +135,14 @@ export default class ScrapSocketTask {
                 socketMarket.nbModificationsOnMarkets += market.modificationsOnMarket?.length ?? 0;
             } else {
                 this.addConnectionToMarkets([market], 'close', 'could not find getBestSocketMarket');
-                // if (this.socketMarkets.find(s => s.markets.length < this.maxNbMarketPerSocket)) {
+                // if (this.orbitxManager.socketMarkets.find(s => s.markets.length < this.maxNbMarketPerSocket)) {
                 //     const message = "getBestSocketMarket socketMarket is undefined " + this.getLogSocketMarketsState();
                 //     console.error(message);
                 // }
             }
         }
         const socketMarketIdsToRemove: number[] = [];
-        for (const socketMarket of this.socketMarkets) {
+        for (const socketMarket of this.orbitxManager.socketMarkets) {
             if (socketMarket.markets.length > 0) {
                 if (
                     (socketMarket.oldMarketIds ?? []).sort().join(',') !==
@@ -159,7 +157,7 @@ export default class ScrapSocketTask {
                 socketMarketIdsToRemove.push(socketMarket.id);
             }
         }
-        this.socketMarkets = this.socketMarkets.filter(s => !socketMarketIdsToRemove.includes(s.id));
+        this.orbitxManager.socketMarkets = this.orbitxManager.socketMarkets.filter(s => !socketMarketIdsToRemove.includes(s.id));
         return assignedMarkets;
     }
 
@@ -212,7 +210,7 @@ export default class ScrapSocketTask {
     }
 
     private getBestSocketMarket(market: MarketInterface): SocketMarketInterface | undefined {
-        const socketMarkets = this.socketMarkets.filter(s =>
+        const socketMarkets = this.orbitxManager.socketMarkets.filter(s =>
             s.markets.length < this.maxNbMarketPerSocket &&
             (
                 s.websocket!.readyState === WebSocket.CONNECTING ||
@@ -250,18 +248,18 @@ export default class ScrapSocketTask {
     private async createMarketSockets() {
         const expectedNbSocketMarkets = this.getExpectedNbSocketMarkets();
         let alreadyAssigned = false;
-        if (this.socketMarkets.length < expectedNbSocketMarkets) {
+        if (this.orbitxManager.socketMarkets.length < expectedNbSocketMarkets) {
             const browser = await BrowserManager.acquire(OrbitxManager.cache);
-            for (let i = this.socketMarkets.length; i < expectedNbSocketMarkets; i++) {
+            for (let i = this.orbitxManager.socketMarkets.length; i < expectedNbSocketMarkets; i++) {
                 const newSocketMarket = await this.createNewSocketMarket(browser);
-                this.socketMarkets.push(newSocketMarket);
+                this.orbitxManager.socketMarkets.push(newSocketMarket);
                 this.assignMarketsToSocketMarkets();
                 alreadyAssigned = true;
             }
             await BrowserManager.release();
         }
-        if (this.socketMarkets.length > expectedNbSocketMarkets) {
-            for (const [index, socketMarket] of this.socketMarkets.entries()) {
+        if (this.orbitxManager.socketMarkets.length > expectedNbSocketMarkets) {
+            for (const [index, socketMarket] of this.orbitxManager.socketMarkets.entries()) {
                 if (index >= expectedNbSocketMarkets) {
                     socketMarket.closing = true;
                     alreadyAssigned = false;
@@ -280,7 +278,7 @@ export default class ScrapSocketTask {
             s.websocket!.readyState === WebSocket.OPEN ||
             s.websocket!.readyState === WebSocket.CONNECTING
         );
-        if (this.getExpectedNbSocketMarkets() === this.socketMarkets.filter(s => s.canListen).length) { // prioritize socketMarkets
+        if (this.getExpectedNbSocketMarkets() === this.orbitxManager.socketMarkets.filter(s => s.canListen).length) { // prioritize socketMarkets
             if (this.waitingSocketMarkets.length < expectedNbWaitingSocketMarkets) {
                 const browser = await BrowserManager.acquire(OrbitxManager.cache);
                 for (let i = this.waitingSocketMarkets.length; i < expectedNbWaitingSocketMarkets; i++) {
@@ -314,6 +312,7 @@ export default class ScrapSocketTask {
             nbModificationsOnMarkets: 0,
             canListen: false,
             lastReceivedMessage: undefined,
+            pingInterval: null,
         };
         newSocketMarket.websocket = await this.createWebsocketForSocketMarket(browser, newSocketMarket)
         return newSocketMarket;
@@ -501,13 +500,13 @@ export default class ScrapSocketTask {
         if (this.isWaitingSocketMarket(socketMarket)) {
             return;
         }
-        this.socketMarkets = this.socketMarkets.filter(s => s.id !== socketMarket.id);
+        this.orbitxManager.socketMarkets = this.orbitxManager.socketMarkets.filter(s => s.id !== socketMarket.id);
         if (socketMarket.markets.length > 0) {
             const replaceSocketMarket = this.waitingSocketMarkets.find(s => s.canListen);
             if (replaceSocketMarket) {
                 this.waitingSocketMarkets = this.waitingSocketMarkets.filter(w => w.id !== replaceSocketMarket.id);
                 replaceSocketMarket.markets = socketMarket.markets;
-                this.socketMarkets.push(replaceSocketMarket);
+                this.orbitxManager.socketMarkets.push(replaceSocketMarket);
                 this.sendListeningMarkets(replaceSocketMarket, "switchOnWaitingSocketMarket");
             } else {
                 const assignedMarkets = this.assignMarketsToSocketMarkets();

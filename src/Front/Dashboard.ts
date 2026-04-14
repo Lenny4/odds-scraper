@@ -1,6 +1,8 @@
 import App from "../App";
 import {Server} from "socket.io";
 import humanizeDuration from "humanize-duration";
+import {SupplierManager} from "../Suppliers/SupplierManager";
+import {DetailAppInterface} from "../Interface/AppInterface";
 
 export default class Dashboard {
     public app: App;
@@ -37,58 +39,40 @@ export default class Dashboard {
 
     private async getDetails() {
         const now = Date.now();
-        const details: any = {
-            markets: this.app.orbitxManager.markets.map(m => {
+
+        const supplierManagers = Object.values(this.app).filter(supplierManager => supplierManager instanceof SupplierManager);
+        const details: DetailAppInterface = {
+            groupMarkets: this.app.groupMarkets.map(gm => {
                 return {
-                    id: m.id,
-                    name: m.name,
-                    event: m.event,
-                }
-            }) ?? [],
-            // groupMarkets: this.app.groupMarkets.map(gm => {
-            //     return {
-            //         markets: gm.markets.map(m => {
-            //             return {
-            //                 id: m.id,
-            //                 supplier: m.supplier,
-            //                 event: {
-            //                     name: m.event.name,
-            //                 }
-            //             }
-            //         })
-            //     }
-            // }),
-            expectedNbSocketMarkets: this.app.orbitxManager.scrapSocketTask?.getExpectedNbSocketMarkets(),
-            expectedNbWaitingSocketMarkets: this.app.orbitxManager.scrapSocketTask?.getExpectedNbWaitingSocketMarkets(),
-            socketMarkets: this.app.orbitxManager.scrapSocketTask?.socketMarkets.map((s) => {
-                const result: any = {
-                    ...s,
-                    markets: s.markets.map(m => {
+                    id: gm.id,
+                    markets: gm.markets.map(m => {
                         return {
-                            id: m?.id,
+                            id: m.id,
+                            supplier: m.supplier,
+                            event: m.event,
                             nbModificationsOnMarket: m.modificationsOnMarket?.length,
                         }
-                    }),
-                    newNbModificationsOnMarkets: s.markets.reduce((sum, m) => {
-                        return sum + (m?.modificationsOnMarket?.length || 0);
-                    }, 0),
-                    websocket: s.websocket?.readyState,
-                    ...(s.markets.length > 0 && {
-                        lastReceivedMessageDiff: humanizeDuration(now - (s.lastReceivedMessage ?? 0), {
-                            largest: 2,
-                            round: true,
-                        }),
-                    }),
+                    })
                 }
-                if (result.hasOwnProperty("oldMarketIds")) {
-                    delete result.oldMarketIds;
-                }
-                return result
             }),
-            waitingSocketMarkets: this.app.orbitxManager.scrapSocketTask?.waitingSocketMarkets.map((s) => {
+            socketMarkets: supplierManagers.map((supplierManager) => {
                 return {
-                    ...s,
-                    websocket: s.websocket?.readyState
+                    name: supplierManager.name,
+                    socketMarkets: supplierManager.socketMarkets.map(socketMarket => {
+                        return {
+                            markets: socketMarket.markets.map(m => m.id),
+                            newNbModificationsOnMarkets: socketMarket.markets.reduce((sum, m) => {
+                                return sum + (m?.modificationsOnMarket?.length || 0);
+                            }, 0),
+                            websocket: socketMarket.websocket?.readyState,
+                            ...(socketMarket.markets.length > 0 && {
+                                lastReceivedMessageDiff: humanizeDuration(now - (socketMarket.lastReceivedMessage ?? 0), {
+                                    largest: 2,
+                                    round: true,
+                                }),
+                            }),
+                        }
+                    }),
                 }
             }),
         }

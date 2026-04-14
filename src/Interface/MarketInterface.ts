@@ -126,6 +126,7 @@ export interface SocketMarketInterface {
     oldMarketIds: (string | number)[];
     nbModificationsOnMarkets: number;
     lastReceivedMessage: number | undefined;
+    pingInterval: NodeJS.Timeout | null;
 }
 
 export interface MarketDefinitionRunnerInterface {

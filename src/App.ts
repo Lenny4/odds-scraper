@@ -17,15 +17,15 @@ import stringSimilarity from "string-similarity";
 import LiveSocketService from "./Service/LiveSocketService";
 
 export default class App {
-    public orbitxManager: OrbitxManager;
-    public polymarketManager: PolymarketManager;
-
-    public mongoService: MongoService;
-    public liveSocketService: LiveSocketService;
-    public dashboard: Dashboard;
-    public groupMarketId: number = 0;
-    public groupMarkets: GroupMarketInterface[] = [];
-    public competitionMapping: CompetitionMappingInterface[] = [
+    static readonly checkMarketModificationOnLast: number = 5 * 60_000;
+    orbitxManager: OrbitxManager;
+    polymarketManager: PolymarketManager;
+    mongoService: MongoService;
+    liveSocketService: LiveSocketService;
+    dashboard: Dashboard;
+    groupMarketId: number = 0;
+    groupMarkets: GroupMarketInterface[] = [];
+    competitionMapping: CompetitionMappingInterface[] = [
         {
             enum: CompetitionEnum.Nba,
             values: [

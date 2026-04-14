@@ -1,6 +1,6 @@
 'use strict';
 
-import {MarketInterface, RunnerInterface, SportInterface} from "../../Interface/MarketInterface";
+import {MarketInterface, RunnerInterface, SocketMarketInterface, SportInterface} from "../../Interface/MarketInterface";
 import App from "../../App";
 import {SupplierInterface} from "../../Interface/SupplierInterface";
 import ScrapEventTask from "./ScrapEventTask";
@@ -17,6 +17,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     app!: App;
     name: string = "OrbitxManager";
     markets: MarketInterface[] = [];
+    socketMarkets: SocketMarketInterface[] = [];
     running: boolean = false;
     readonly sports: SportInterface[] = [
         // {
@@ -130,6 +131,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
 
     canScrapMarket(market: MarketInterface): boolean {
         const now = Date.now();
+        const liveCompetitions = (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum));
         return (
             !this.getMarketIsFinish(market) &&
             (
@@ -140,19 +142,26 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                     ) &&
                     market.startTime - (2 * 3600 * 1000) < now
                 ) ||
-                market.totalMatched > 20_000 // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
+                (market.totalMatched > 20_000 || liveCompetitions) // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
             ) &&
             market.numberOfWinners === 1 &&
-            (now + (15 * 60 * 1000) < market.startTime || (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum))) &&
+            (now + (15 * 60 * 1000) < market.startTime || liveCompetitions) &&
             [2, 3].includes(market.runners.length)
         );
     }
 
     getStatus(status: string): MarketStatusEnum | null {
-        if (status === "OPEN") {
-            return MarketStatusEnum.Open;
+        const statusMap: Record<string, MarketStatusEnum> = {
+            open: MarketStatusEnum.Open,
+            closed: MarketStatusEnum.Closed,
+            suspended: MarketStatusEnum.Suspended,
+        };
+
+        const result = statusMap[status.toLowerCase()];
+        if (!result) {
+            console.error("getStatus OrbitxManager unknown", status);
+            return null;
         }
-        console.error("getStatus OrbitxManager unknown", status)
-        return null;
+        return result;
     }
 }

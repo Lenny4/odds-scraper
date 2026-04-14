@@ -1,8 +1,9 @@
 'use strict';
 
 export enum MarketStatusEnum {
-    Open = "OPEN",
+    Open = "open",
     Closed = "closed",
+    Suspended = "suspended",
 }
 
 export enum OddTypeEnum {
