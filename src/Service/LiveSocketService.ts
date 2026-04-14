@@ -34,6 +34,7 @@ export default class LiveSocketService {
             }
         });
         this.io.on("connection", (socket) => {
+            console.log("new socket connected !")
             socket.on("message", (data: LiveMessageInterface) => {
                 if (data.type === 'groupMarkets') {
                     socket.emit("message", this.groupMarketsMessage(data.value));
