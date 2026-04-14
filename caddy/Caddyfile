@@ -4,6 +4,10 @@ https://superpower-betting-exchange.com {
         header_up X-Forwarded-Proto {scheme}
         header_up X-Forwarded-Host {host}
         header_up Host {host}
+     # Add these:
+        header_up Connection {http.request.header.Connection}
+        header_up Upgrade {http.request.header.Upgrade}
     }
+
     encode gzip
 }
