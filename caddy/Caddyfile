@@ -1,5 +1,5 @@
 https://superpower-betting-exchange.com {
-    reverse_proxy node:{$NODE_PORT:4003} {
+    reverse_proxy node:{$NODE_PORT:4004} {
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
         header_up X-Forwarded-Host {host}
