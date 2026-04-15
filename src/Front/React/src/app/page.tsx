@@ -1,15 +1,19 @@
 "use client"
 
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Accordion, AccordionDetails, AccordionSummary, Typography} from "@mui/material";
 import {DetailAppInterface} from "../../../../Interface/AppInterface";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
     GroupMarketMessageInterface,
-    GroupMarketRequestInterface,
-    OddReceiveInterface
+    OddReceiveInterface,
+    OddRequestInterface
 } from "../../../../Interface/LiveInterface";
 import {socketDetails, socketGroupMarkets} from "@/app/sockets";
+import {getValueByPath} from "../../../../Service/Utils";
+import {OddInterface} from "../../../../Interface/MarketInterface";
+import Chart from "react-apexcharts";
+import {ApexOptions} from "apexcharts";
 
 type JsonProps = {
     json: unknown;
@@ -45,51 +49,142 @@ function PreJson({json}: JsonProps) {
     );
 }
 
-function GroupMarket({initGroupMarket}: { initGroupMarket: GroupMarketMessageInterface }) {
-    const [groupMarket, setGroupMarket] = useState<GroupMarketMessageInterface>(initGroupMarket)
-    const getGroupMarketOdds = (groupMarketRequest: GroupMarketRequestInterface) => {
-        socketGroupMarkets.emit("message", {
-            type: "groupMarkets",
-            value: groupMarketRequest,
-        });
-    }
+function ChartGroupMarket({groupMarketMessage}: { groupMarketMessage: GroupMarketMessageInterface }) {
+    const [options, setOptions] = useState<ApexOptions>({
+        chart: {
+            id: "basic-bar"
+        },
+        xaxis: {
+            categories: [1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999]
+        }
+    })
+    const [series, setSeries] = useState<ApexOptions["series"]>([
+        {
+            name: "series-1",
+            data: [30, 40, 45, 50, 49, 60, 70, 91]
+        }
+    ])
+    return (
+        <div>
+            <Chart
+                options={options}
+                series={series}
+                type="line"
+            />
+        </div>
+    );
+}
 
-    const handleGroupMarketMessage = (groupMarketMessages: GroupMarketMessageInterface[]) => {
-        const groupMarketMessage = groupMarketMessages.find(gm => gm.id === groupMarket.id);
-        if (groupMarketMessage) {
-            setGroupMarket(groupMarketMessage);
+function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMarketMessageInterface }) {
+    const [groupMarketMessage, setGroupMarketMessage] = useState<GroupMarketMessageInterface>(initGroupMarketMessage)
+
+    const getOddRequests = () => {
+        const oddRequests: OddRequestInterface[] = [];
+        for (const market of groupMarketMessage.markets) {
+            const defaultOddRequest: OddRequestInterface = {
+                groupMarketId: groupMarketMessage.id,
+                marketId: market.id,
+                path: "",
+                supplier: market.supplier,
+            };
+            for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
+                if (marketRunner.odds.length === 0) {
+                    oddRequests.push({
+                        ...defaultOddRequest,
+                        path: `marketRunners[${indexMarketRunner}].odds`,
+                    });
+                }
+            }
+        }
+        if (oddRequests.length > 0) {
+            socketGroupMarkets.emit("message", {
+                type: "odds",
+                value: oddRequests,
+            });
         }
     };
 
     const handleOddReceive = (oddReceives: OddReceiveInterface[]) => {
-        console.log("oddReceive", oddReceives);
+        const oddRequests: OddRequestInterface[] = [];
+        oddReceives = oddReceives.filter(or => or.groupMarketId === groupMarketMessage.id);
+        if (oddReceives.length === 0) {
+            return;
+        }
+        setGroupMarketMessage(gm => {
+            for (const oddReceive of oddReceives) {
+                const market = gm.markets.find(m => m.id === oddReceive.marketId && m.supplier === oddReceive.supplier);
+                const oldOdds: OddInterface[] = getValueByPath(market, oddReceive.path);
+                for (const newOdd of oddReceive.odds ?? []) {
+                    if (newOdd.values.length === 0) {
+                        continue;
+                    }
+                    const oldOdd = oldOdds.find(o =>
+                        o.name === newOdd.name ||
+                        o.type === newOdd.type ||
+                        o.index === newOdd.index
+                    );
+                    const oddRequest: OddRequestInterface = {
+                        i: 1,
+                        marketId: oddReceive.marketId,
+                        path: oddReceive.path,
+                        groupMarketId: oddReceive.groupMarketId,
+                        supplier: oddReceive.supplier,
+                        type: newOdd.type,
+                        name: newOdd.name,
+                        index: newOdd.index,
+                    }
+                    if (oldOdd) {
+                        const currentI = newOdd.values.at(-1)?.i ?? 0;
+                        if (currentI + 1 < newOdd.values[0].i) {
+                            oddRequests.push({
+                                i: currentI + 1,
+                                ...oddRequest,
+                            });
+                        } else {
+                            oldOdd.values = [...oldOdd.values, ...newOdd.values.filter(v => v.i > currentI)];
+                        }
+                    } else {
+                        if (newOdd.values[0].i === 1) {
+                            oldOdds.push(newOdd);
+                        } else {
+                            oddRequests.push(oddRequest);
+                        }
+                    }
+                }
+            }
+            return {...gm};
+        })
+        if (oddRequests.length > 0) {
+            console.warn("missing", oddRequests);
+            socketGroupMarkets.emit("message", {
+                type: "odds",
+                value: oddRequests,
+            });
+        }
     };
 
     const handleMessage = (data: OddReceiveInterface[] | GroupMarketMessageInterface[]) => {
         if (data.length === 0) return;
-
-        if ("id" in data[0]) {
-            // @ts-ignore
-            handleGroupMarketMessage(data);
-        } else {
+        if ("path" in data[0]) {
             // @ts-ignore
             handleOddReceive(data);
+        } else {
+            console.log("new message", data)
         }
     };
 
     useEffect(() => {
-        getGroupMarketOdds({
-            groupMarketIds: [groupMarket.id],
-        })
+        getOddRequests();
         socketGroupMarkets.on("message", handleMessage);
         return () => {
             socketGroupMarkets.off("message", handleMessage);
         };
-    }, [groupMarket.id]);
+    }, [groupMarketMessage.id]);
+
 
     return (
         <div>
-            display chart
+            <ChartGroupMarket groupMarketMessage={groupMarketMessage}/>
         </div>
     );
 }
@@ -151,7 +246,7 @@ export default function Home() {
                             </Typography>
                         </AccordionSummary>
                         <AccordionDetails>
-                            {openGroupMarkets.includes(gm.id) && <GroupMarket initGroupMarket={gm}/>}
+                            {openGroupMarkets.includes(gm.id) && <GroupMarket initGroupMarketMessage={gm}/>}
                         </AccordionDetails>
                     </Accordion>
                 )

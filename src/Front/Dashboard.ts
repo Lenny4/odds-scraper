@@ -3,6 +3,7 @@ import {Server} from "socket.io";
 import humanizeDuration from "humanize-duration";
 import {SupplierManager} from "../Suppliers/SupplierManager";
 import {DetailAppInterface} from "../Interface/AppInterface";
+import {GroupMarketMessageInterface, MarketMessageInterface} from "../Interface/LiveInterface";
 
 export default class Dashboard {
     public app: App;
@@ -43,17 +44,27 @@ export default class Dashboard {
         const supplierManagers = Object.values(this.app).filter(supplierManager => supplierManager instanceof SupplierManager);
         const details: DetailAppInterface = {
             groupMarkets: this.app.groupMarkets.map(gm => {
-                return {
+                const groupMarketMessage: GroupMarketMessageInterface = {
                     id: gm.id,
                     markets: gm.markets.map(m => {
-                        return {
+                        const marketMessage: MarketMessageInterface = {
+                            marketRunners: m.marketRunners.map(mr => {
+                                return {
+                                    ...mr,
+                                    odds: [],
+                                }
+                            }),
+                            name: m.name,
+                            odds: [],
+                            runners: m.runners,
                             id: m.id,
                             supplier: m.supplier,
-                            event: m.event,
-                            nbModificationsOnMarket: m.modificationsOnMarket?.length,
+                            event: m.event
                         }
+                        return marketMessage
                     })
-                }
+                };
+                return groupMarketMessage;
             }),
             socketMarkets: supplierManagers.map((supplierManager) => {
                 return {
