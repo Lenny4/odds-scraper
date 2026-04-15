@@ -15,7 +15,7 @@ import {OddInterface} from "../../../../Interface/MarketInterface";
 import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
 import {ChartDataInterface, SerieColorInterface, SerieInterface} from "@/interface/ChartInterface";
-import {OddTypeEnum} from "../../../../Enum/MarketEnum";
+import {OddNameEnum} from "../../../../Enum/MarketEnum";
 
 type JsonProps = {
     json: unknown;
@@ -90,10 +90,10 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     }
 
     const getColor = (odd: OddInterface): SerieColorInterface => {
-        if (odd.type === OddTypeEnum.Back) {
+        if (odd.supplier === "OrbitxManager") {
             return {r: 166, g: 216, b: 255, a: 1}
         }
-        if (odd.type === OddTypeEnum.Lay) {
+        if (odd.supplier === "PolymarketManager") {
             return {r: 250, g: 201, b: 209, a: 1}
         }
         return {r: 0, g: 0, b: 0, a: 0.5}
@@ -231,7 +231,6 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                 },
             },
         };
-        console.log(chartData, options)
         setOptions(options);
     }
 
@@ -255,6 +254,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
             const defaultOddRequest: OddRequestInterface = {
                 groupMarketId: groupMarketMessage.id,
                 marketId: market.id,
+                name: OddNameEnum.RunnerOddValue,
                 path: "",
                 supplier: market.supplier,
                 index: 0,
@@ -296,8 +296,9 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                         continue;
                     }
                     const oldOdd = oldOdds.find(o =>
-                        o.name === newOdd.name ||
-                        o.type === newOdd.type ||
+                        o.name === newOdd.name &&
+                        o.type === newOdd.type &&
+                        o.supplier === newOdd.supplier &&
                         o.index === newOdd.index
                     );
                     const oddRequest: OddRequestInterface = {
