@@ -1,15 +1,5 @@
 'use strict';
-import {EventInterface} from "./MarketInterface";
-
-export interface GroupMarketDetailInterface {
-    id: number;
-    markets: {
-        id: string | number;
-        supplier: string;
-        event: EventInterface;
-        nbModificationsOnMarket: number;
-    }[];
-}
+import {GroupMarketMessageInterface} from "./LiveInterface";
 
 export interface SocketMarketDetailInterface {
     name: string;
@@ -25,6 +15,6 @@ export interface SocketMarketDetailInterface {
 }
 
 export interface DetailAppInterface {
-    groupMarkets: GroupMarketDetailInterface[];
+    groupMarkets: GroupMarketMessageInterface[];
     socketMarkets: SocketMarketDetailInterface[];
 }

@@ -1,10 +1,15 @@
 "use client"
 
 import {useEffect, useState} from "react";
-import {io} from "socket.io-client";
 import {Accordion, AccordionDetails, AccordionSummary, Typography} from "@mui/material";
-import {DetailAppInterface, GroupMarketDetailInterface} from "../../../../Interface/AppInterface";
+import {DetailAppInterface} from "../../../../Interface/AppInterface";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {
+    GroupMarketMessageInterface,
+    GroupMarketRequestInterface,
+    OddReceiveInterface
+} from "../../../../Interface/LiveInterface";
+import {socketDetails, socketGroupMarkets} from "@/app/sockets";
 
 type JsonProps = {
     json: unknown;
@@ -40,7 +45,48 @@ function PreJson({json}: JsonProps) {
     );
 }
 
-function GroupMarket({groupMarket}: { groupMarket: GroupMarketDetailInterface }) {
+function GroupMarket({initGroupMarket}: { initGroupMarket: GroupMarketMessageInterface }) {
+    const [groupMarket, setGroupMarket] = useState<GroupMarketMessageInterface>(initGroupMarket)
+    const getGroupMarketOdds = (groupMarketRequest: GroupMarketRequestInterface) => {
+        socketGroupMarkets.emit("message", {
+            type: "groupMarkets",
+            value: groupMarketRequest,
+        });
+    }
+
+    const handleGroupMarketMessage = (groupMarketMessages: GroupMarketMessageInterface[]) => {
+        const groupMarketMessage = groupMarketMessages.find(gm => gm.id === groupMarket.id);
+        if (groupMarketMessage) {
+            setGroupMarket(groupMarketMessage);
+        }
+    };
+
+    const handleOddReceive = (oddReceives: OddReceiveInterface[]) => {
+        console.log("oddReceive", oddReceives);
+    };
+
+    const handleMessage = (data: OddReceiveInterface[] | GroupMarketMessageInterface[]) => {
+        if (data.length === 0) return;
+
+        if ("id" in data[0]) {
+            // @ts-ignore
+            handleGroupMarketMessage(data);
+        } else {
+            // @ts-ignore
+            handleOddReceive(data);
+        }
+    };
+
+    useEffect(() => {
+        getGroupMarketOdds({
+            groupMarketIds: [groupMarket.id],
+        })
+        socketGroupMarkets.on("message", handleMessage);
+        return () => {
+            socketGroupMarkets.off("message", handleMessage);
+        };
+    }, [groupMarket.id]);
+
     return (
         <div>
             display chart
@@ -59,21 +105,23 @@ export default function Home() {
     };
 
     useEffect(() => {
-        const socket = io('http://' + window.location.hostname + ':4002');
-        socket.on('connect', () => {
-            console.log('connected');
+        socketGroupMarkets.emit("message", {
+            type: "join",
+            value: openGroupMarkets
         });
-        socket.on('details', (data) => {
+    }, [openGroupMarkets]);
+
+    useEffect(() => {
+        socketDetails.on('connect', () => {
+            // nothing
+        });
+        socketDetails.on('details', (data) => {
             setDetailApp(data);
-            console.log(data);
+            // console.log(data);
         });
-        socket.on('disconnect', () => {
-            console.log('disconnected');
+        socketDetails.on('disconnect', () => {
             setDetailApp(undefined);
         });
-        return () => {
-            socket.disconnect();
-        };
     }, [])
 
     if (!detailApp) {
@@ -103,7 +151,7 @@ export default function Home() {
                             </Typography>
                         </AccordionSummary>
                         <AccordionDetails>
-                            {openGroupMarkets.includes(gm.id) && <GroupMarket groupMarket={gm}/>}
+                            {openGroupMarkets.includes(gm.id) && <GroupMarket initGroupMarket={gm}/>}
                         </AccordionDetails>
                     </Accordion>
                 )

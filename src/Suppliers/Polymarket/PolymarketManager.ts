@@ -113,9 +113,9 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             marketRunners: [],
             name: polymarketMarket.sportsMarketType,
             numberOfWinners: 1,
-            runners: JSON.parse(polymarketMarket.outcomes).map((name: string, index: number) => {
+            runners: JSON.parse(polymarketMarket.outcomes ?? "[]").map((name: string, index: number) => {
                 const runner: RunnerInterface = {
-                    id: JSON.parse(polymarketMarket.clobTokenIds)[index],
+                    id: JSON.parse(polymarketMarket.clobTokenIds ?? "[]")[index],
                     name: name,
                 }
                 return runner;
@@ -129,7 +129,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             modificationsOnMarket: [],
             connections: [],
             isSaving: false,
-            clobTokenIds: JSON.parse(polymarketMarket.clobTokenIds),
+            clobTokenIds: JSON.parse(polymarketMarket.clobTokenIds ?? "[]"),
         };
         this.initMarket(market, this.name);
         return market;

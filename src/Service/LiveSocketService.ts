@@ -30,11 +30,11 @@ export default class LiveSocketService {
         const httpServer = createServer();
         this.io = new Server(httpServer, {
             cors: {
-                origin: ["*"],
+                origin: "http://localhost:4001",
+                credentials: true
             }
         });
         this.io.on("connection", (socket) => {
-            console.log("new socket connected !")
             socket.on("message", (data: LiveMessageInterface) => {
                 if (data.type === 'groupMarkets') {
                     socket.emit("message", this.groupMarketsMessage(data.value));
@@ -96,32 +96,28 @@ export default class LiveSocketService {
     private oddsMessage(oddRequests: OddRequestInterface[]) {
         const oddReceives: OddReceiveInterface[] = [];
         for (const oddRequest of oddRequests) {
+            let odds: OddInterface[] | undefined = undefined;
+            const market = this.app.groupMarkets.find(gm => gm.id === oddRequest.groupMarketId)?.markets.find(m => m.supplier === oddRequest.supplier && m.id === oddRequest.marketId);
+            if (market) {
+                odds = getValueByPath(market, oddRequest.path);
+                odds = odds!.filter(o =>
+                    (o.name === oddRequest.name || oddRequest.name === undefined) &&
+                    (o.type === oddRequest.type || oddRequest.type === undefined) &&
+                    (o.index === oddRequest.index || oddRequest.index === undefined)
+                );
+                if (oddRequest.i !== undefined) {
+                    for (const [index, odd] of odds.entries()) {
+                        odds[index] = clone(odd);
+                        odds[index].values = odd.values.filter(o => o.i >= oddRequest.i!)
+                    }
+                }
+            }
             oddReceives.push({
                 ...oddRequest,
-                odds: this.getOdds(oddRequest),
+                odds: odds,
             })
         }
         return oddReceives;
-    }
-
-    private getOdds(oddRequest: OddRequestInterface): OddInterface[] | undefined {
-        const market = this.app.groupMarkets.find(gm => gm.id === oddRequest.groupMarketId)?.markets.find(m => m.supplier === oddRequest.supplier && m.id === oddRequest.marketId);
-        if (!market) {
-            return undefined;
-        }
-        let odds: OddInterface[] = getValueByPath(market, oddRequest.path);
-        odds = odds.filter(o =>
-            (o.name === oddRequest.name || oddRequest.name === undefined) &&
-            (o.type === oddRequest.type || oddRequest.type === undefined) &&
-            (o.index === oddRequest.index || oddRequest.index === undefined)
-        );
-        if (oddRequest.i !== undefined) {
-            for (const [index, odd] of odds.entries()) {
-                odds[index] = clone(odd);
-                odds[index].values = odd.values.filter(o => o.i >= oddRequest.i!)
-            }
-        }
-        return odds;
     }
 
     private joinRooms(socket: Socket, groupMarketIds: string[]) {
