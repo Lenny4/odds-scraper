@@ -262,13 +262,13 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                     const valueOddValue = Math.round((1 / Number(prop.price)) * 1000);
                     const oddLabel = this.getOddLabel(runner, type.value, index, this.name);
                     if (valueOddValue > 1) {
-                        const oddRunnerOddValue = this.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, type.value, index);
+                        const oddRunnerOddValue = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.name, type.value, index);
                         this.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }
 
                     const valueOddVolume = Math.round(Number(prop.size));
                     if (valueOddVolume > 0) {
-                        const oddRunnerOddVolume = this.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, type.value, index);
+                        const oddRunnerOddVolume = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, this.name, type.value, index);
                         this.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
                     }
                 }

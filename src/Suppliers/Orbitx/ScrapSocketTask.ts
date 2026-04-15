@@ -459,7 +459,7 @@ export default class ScrapSocketTask {
         market.modificationsOnMarket.push(now);
 
         const valueMarketVolume = Math.round(Number(data.tv));
-        const oddMarketVolume = this.orbitxManager.getOdd(market.odds, OddNameEnum.MarketVolume, `Market volume [${this.orbitxManager.name}]`);
+        const oddMarketVolume = this.orbitxManager.getCreateOdd(market.odds, OddNameEnum.MarketVolume, `Market volume [${this.orbitxManager.name}]`, this.orbitxManager.name);
         this.orbitxManager.addOddValue(oddMarketVolume, valueMarketVolume, now)
         market.totalMatched = valueMarketVolume;
 
@@ -483,13 +483,13 @@ export default class ScrapSocketTask {
                     const valueOddValue = Math.round(bdat.odds * 1000);
                     const oddLabel = this.orbitxManager.getOddLabel(runner, type.value, bdat.index, this.orbitxManager.name);
                     if (valueOddValue > 1) {
-                        const oddRunnerOddValue = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, type.value, bdat.index);
+                        const oddRunnerOddValue = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.orbitxManager.name, type.value, bdat.index);
                         this.orbitxManager.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }
 
                     const valueOddVolume = Math.round(bdat.amount);
                     if (valueOddVolume > 0) {
-                        const oddRunnerOddVolume = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, type.value, bdat.index);
+                        const oddRunnerOddVolume = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, this.orbitxManager.name, type.value, bdat.index);
                         this.orbitxManager.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
                     }
                 }

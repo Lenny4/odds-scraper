@@ -31,7 +31,7 @@ export interface SupplierInterface {
 
     removeMarkets(ids: (string | number)[], time: number): Promise<void>;
 
-    getOdd(odds: OddInterface[], name: OddNameEnum, label: string, type: OddTypeEnum | undefined, index: number | undefined): OddInterface;
+    getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined, index: number | undefined): OddInterface;
 
     addOddValue(odd: OddInterface, value: number, time: number): void;
 }

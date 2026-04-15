@@ -116,8 +116,8 @@ export abstract class SupplierManager {
         this.markets = this.markets.filter(m => !marketIdsToRemove.includes(m.id));
     }
 
-    getOdd(odds: OddInterface[], name: OddNameEnum, label: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
-        let odd = odds.find(o => o.name === name && o.type === type && o.index === index);
+    getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
+        let odd = odds.find(o => o.name === name && o.type === type && o.index === index && o.supplier === supplier);
         if (!odd) {
             odd = {
                 type: type,
@@ -126,6 +126,7 @@ export abstract class SupplierManager {
                 nbValues: 0,
                 index: index,
                 values: [],
+                supplier: supplier,
             }
             odds.push(odd);
         }

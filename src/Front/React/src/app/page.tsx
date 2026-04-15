@@ -14,7 +14,8 @@ import {getOddsForOddRequest, getValueByPath} from "../../../../Service/Utils";
 import {OddInterface} from "../../../../Interface/MarketInterface";
 import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
-import {ChartDataInterface, SerieInterface} from "@/interface/ChartInterface";
+import {ChartDataInterface, SerieColorInterface, SerieInterface} from "@/interface/ChartInterface";
+import {OddTypeEnum} from "../../../../Enum/MarketEnum";
 
 type JsonProps = {
     json: unknown;
@@ -88,6 +89,16 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         });
     }
 
+    const getColor = (odd: OddInterface): SerieColorInterface => {
+        if (odd.type === OddTypeEnum.Back) {
+            return {r: 166, g: 216, b: 255, a: 1}
+        }
+        if (odd.type === OddTypeEnum.Lay) {
+            return {r: 250, g: 201, b: 209, a: 1}
+        }
+        return {r: 0, g: 0, b: 0, a: 0.5}
+    }
+
     const getChartData = () => {
         const chartData: ChartDataInterface = {
             allTimestamps: [],
@@ -103,15 +114,25 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             const odds = getOddsForOddRequest(market, oddRequest);
             for (const odd of odds) {
                 const serie: SerieInterface = {
+                    yMax: undefined,
+                    yMin: undefined,
                     name: odd.label,
                     values: [],
                     times: [],
+                    color: getColor(odd)
                 };
                 for (const oddValue of odd.values) {
-                    const v = oddValue.v;
+                    const v = oddValue.v / 1000;
                     const t = oddValue.t;
                     serie.values.push(v);
                     serie.times.push(t);
+                    if (serie.yMax === undefined || v > serie.yMax) {
+                        serie.yMax = v;
+                    }
+                    if (serie.yMin === undefined || v < serie.yMin) {
+                        serie.yMin = v;
+                    }
+
                     if (chartData.yMax === undefined || v > chartData.yMax) {
                         chartData.yMax = v;
                     }
@@ -134,24 +155,84 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         chartData.series = alignSeries(chartData.series, chartData.allTimestamps);
         return chartData;
     };
-    const updateOption = (): ApexOptions => {
+    const updateOption = () => {
         const chartData = getChartData();
-        console.log(chartData);
-        return {
-            series: [
-                {
-                    name: "series-1",
-                    data: [30, 40, 45, 50, 49, 60, 70, 91]
+        const duration = Math.abs(chartData.allTimestamps[0] - chartData.allTimestamps[chartData.allTimestamps.length - 1]);
+        const options: ApexOptions = {
+            series: chartData.series.map(s => {
+                return {
+                    name: s.name,
+                    data: s.values.map((v, i) => {
+                        return [chartData.allTimestamps[i], v]
+                    }),
                 }
-            ],
+            }),
             chart: {
                 id: groupMarketMessage.id.toString(),
-                type: "line"
+                type: "line",
+                animations: {
+                    enabled: false,
+                },
+                toolbar: {
+                    show: true, // This adds zoom + reset buttons
+                    tools: {
+                        zoom: true,
+                        zoomin: true,
+                        zoomout: true,
+                        pan: true,
+                        reset: true
+                    }
+                },
+                zoom: {
+                    enabled: true,
+                    type: 'x', // Zoom only on x-axis (time)
+                    autoScaleYaxis: true, // Optional: rescale y-axis on zoom
+                    allowMouseWheelZoom: false,
+                },
+            },
+            colors: chartData.series.map(s => {
+                return `rgba(${s.color.r}, ${s.color.g}, ${s.color.b}, ${s.color.a})`
+            }),
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'stepline',
+            },
+            markers: {
+                size: 0
             },
             xaxis: {
-                categories: [1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999]
-            }
+                type: 'datetime',
+                min: Math.round(chartData.xMin! - duration * 0.02),
+                max: Math.round(chartData.xMax! + duration * 0.02)
+            },
+            yaxis: {
+                min: chartData.yMin! - (chartData.yMin! * 0.02),
+                max: chartData.yMax! + (chartData.yMin! * 0.02),
+            },
+            legend: {
+                show: true
+            },
+            subtitle: {
+                text: 'Click on the serie legend at the bottom of the chart to hide the serie',
+                align: 'center',
+                style: {
+                    fontSize: '13px',
+                    color: '#666'
+                }
+            },
+            tooltip: {
+                enabled: true,
+                shared: true, // tells ApexCharts to try showing all series info for a given x value
+                followCursor: true,
+                x: {
+                    format: "yyyy-MM-dd HH:mm:ss"
+                },
+            },
         };
+        console.log(chartData, options)
+        setOptions(options);
     }
 
     useEffect(() => {
@@ -176,9 +257,10 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                 marketId: market.id,
                 path: "",
                 supplier: market.supplier,
+                index: 0,
             };
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
-                if (marketRunner.odds.length === 0) {
+                if (indexMarketRunner === 0 && marketRunner.odds.length === 0) {
                     oddRequests.push({
                         ...defaultOddRequest,
                         path: `marketRunners[${indexMarketRunner}].odds`,

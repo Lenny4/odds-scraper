@@ -12,6 +12,7 @@ export function getOddsForOddRequest(market: MarketInterface | MarketMessageInte
     return getValueByPath(market, oddRequest.path)!.filter((o: OddInterface) =>
         (o.name === oddRequest.name || oddRequest.name === undefined) &&
         (o.type === oddRequest.type || oddRequest.type === undefined) &&
+        (o.supplier === oddRequest.supplier || oddRequest.supplier === undefined) &&
         (o.index === oddRequest.index || oddRequest.index === undefined)
     );
 }
