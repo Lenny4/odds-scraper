@@ -12,7 +12,7 @@ import {
     OddRequestInterface
 } from "../Interface/LiveInterface";
 import {OddInterface} from "../Interface/MarketInterface";
-import {getValueByPath} from "./Utils";
+import {getOddsForOddRequest} from "./Utils";
 
 const clone = require('clone');
 
@@ -99,23 +99,18 @@ export default class LiveSocketService {
             let odds: OddInterface[] | undefined = undefined;
             const market = this.app.groupMarkets.find(gm => gm.id === oddRequest.groupMarketId)?.markets.find(m => m.supplier === oddRequest.supplier && m.id === oddRequest.marketId);
             if (market) {
-                odds = getValueByPath(market, oddRequest.path);
-                odds = odds!.filter(o =>
-                    (o.name === oddRequest.name || oddRequest.name === undefined) &&
-                    (o.type === oddRequest.type || oddRequest.type === undefined) &&
-                    (o.index === oddRequest.index || oddRequest.index === undefined)
-                );
+                odds = getOddsForOddRequest(market, oddRequest);
                 if (oddRequest.i !== undefined) {
                     for (const [index, odd] of odds.entries()) {
                         odds[index] = clone(odd);
                         odds[index].values = odd.values.filter(o => o.i >= oddRequest.i!)
                     }
                 }
+                oddReceives.push({
+                    ...oddRequest,
+                    odds: odds,
+                })
             }
-            oddReceives.push({
-                ...oddRequest,
-                odds: odds,
-            })
         }
         return oddReceives;
     }

@@ -110,7 +110,6 @@ export default class ScrapSocketTask {
     }
 
     private assignMarketsToSocketMarkets(): (string | number)[] {
-        const now = Date.now();
         const assignedMarkets: (string | number)[] = [];
         for (const socketMarket of this.orbitxManager.socketMarkets) {
             socketMarket.oldMarketIds = socketMarket.markets.map(m => m.id);
@@ -460,7 +459,7 @@ export default class ScrapSocketTask {
         market.modificationsOnMarket.push(now);
 
         const valueMarketVolume = Math.round(Number(data.tv));
-        const oddMarketVolume = this.orbitxManager.getOdd(market.odds, OddNameEnum.MarketVolume);
+        const oddMarketVolume = this.orbitxManager.getOdd(market.odds, OddNameEnum.MarketVolume, `Market volume [${this.orbitxManager.name}]`);
         this.orbitxManager.addOddValue(oddMarketVolume, valueMarketVolume, now)
         market.totalMatched = valueMarketVolume;
 
@@ -477,18 +476,20 @@ export default class ScrapSocketTask {
             if (!marketRunner) {
                 throw "marketRunner not founded";
             }
+            const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
             for (const type of this.types) {
                 // @ts-ignore
                 for (const bdat: BdatInterface of rc[type.prop]) {
                     const valueOddValue = Math.round(bdat.odds * 1000);
+                    const oddLabel = this.orbitxManager.getOddLabel(runner, type.value, bdat.index, this.orbitxManager.name);
                     if (valueOddValue > 1) {
-                        const oddRunnerOddValue = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, type.value, bdat.index);
+                        const oddRunnerOddValue = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, type.value, bdat.index);
                         this.orbitxManager.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }
 
                     const valueOddVolume = Math.round(bdat.amount);
                     if (valueOddVolume > 0) {
-                        const oddRunnerOddVolume = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, type.value, bdat.index);
+                        const oddRunnerOddVolume = this.orbitxManager.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, type.value, bdat.index);
                         this.orbitxManager.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
                     }
                 }

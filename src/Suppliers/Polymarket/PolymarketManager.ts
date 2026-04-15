@@ -252,6 +252,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
             market.modificationsOnMarket.push(now);
             const marketRunner = market.marketRunners.find(mr => mr.runnerId === initialDump.asset_id)!;
+            const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
             for (const type of this.types) {
                 // @ts-ignore
                 for (let index = 0; (index < initialDump[type.prop + "s"].length && index < 1); index++) {
@@ -259,14 +260,15 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                     const prop = initialDump[type.prop + "s"][initialDump[type.prop + "s"].length - index - 1];
 
                     const valueOddValue = Math.round((1 / Number(prop.price)) * 1000);
+                    const oddLabel = this.getOddLabel(runner, type.value, index, this.name);
                     if (valueOddValue > 1) {
-                        const oddRunnerOddValue = this.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, type.value, index);
+                        const oddRunnerOddValue = this.getOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, type.value, index);
                         this.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }
 
                     const valueOddVolume = Math.round(Number(prop.size));
                     if (valueOddVolume > 0) {
-                        const oddRunnerOddVolume = this.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, type.value, index);
+                        const oddRunnerOddVolume = this.getOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, type.value, index);
                         this.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
                     }
                 }

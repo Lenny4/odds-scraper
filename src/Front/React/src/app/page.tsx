@@ -10,10 +10,11 @@ import {
     OddRequestInterface
 } from "../../../../Interface/LiveInterface";
 import {socketDetails, socketGroupMarkets} from "@/app/sockets";
-import {getValueByPath} from "../../../../Service/Utils";
+import {getOddsForOddRequest, getValueByPath} from "../../../../Service/Utils";
 import {OddInterface} from "../../../../Interface/MarketInterface";
 import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
+import {ChartDataInterface, SerieInterface} from "@/interface/ChartInterface";
 
 type JsonProps = {
     json: unknown;
@@ -53,7 +54,89 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     groupMarketMessage: GroupMarketMessageInterface,
     oddRequests: OddRequestInterface[]
 }) {
-    const getOptions = (): ApexOptions => {
+    const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
+
+    const alignSeries = (series: SerieInterface[], allTimestamps: number[]) => {
+        return series.map(serie => {
+            const valueByTime = new Map<number, number>();
+
+            for (let i = 0; i < serie.times.length; i++) {
+                valueByTime.set(serie.times[i], serie.values[i]);
+            }
+
+            const alignedValues: number[] = [];
+            let lastValue: number | undefined = undefined;
+
+            for (const t of allTimestamps) {
+                if (valueByTime.has(t)) {
+                    lastValue = valueByTime.get(t)!;
+                }
+
+                if (lastValue === undefined) {
+                    // fallback = first value
+                    lastValue = serie.values[0];
+                }
+
+                alignedValues.push(lastValue);
+            }
+
+            return {
+                ...serie,
+                times: [...allTimestamps],
+                values: alignedValues,
+            };
+        });
+    }
+
+    const getChartData = () => {
+        const chartData: ChartDataInterface = {
+            allTimestamps: [],
+            xMax: undefined,
+            xMin: undefined,
+            series: [],
+            yMax: undefined,
+            yMin: undefined,
+        };
+        const timestampSet = new Set<number>();
+        for (const oddRequest of oddRequests) {
+            const market = groupMarketMessage.markets.find(m => m.id === oddRequest.marketId)!;
+            const odds = getOddsForOddRequest(market, oddRequest);
+            for (const odd of odds) {
+                const serie: SerieInterface = {
+                    name: odd.label,
+                    values: [],
+                    times: [],
+                };
+                for (const oddValue of odd.values) {
+                    const v = oddValue.v;
+                    const t = oddValue.t;
+                    serie.values.push(v);
+                    serie.times.push(t);
+                    if (chartData.yMax === undefined || v > chartData.yMax) {
+                        chartData.yMax = v;
+                    }
+                    if (chartData.yMin === undefined || v < chartData.yMin) {
+                        chartData.yMin = v;
+                    }
+                    if (chartData.xMax === undefined || t > chartData.xMax) {
+                        chartData.xMax = t;
+                    }
+                    if (chartData.xMin === undefined || t < chartData.xMin) {
+                        chartData.xMin = t;
+                    }
+                    timestampSet.add(t);
+                }
+                chartData.series.push(serie);
+            }
+        }
+        chartData.allTimestamps = Array.from(timestampSet);
+        chartData.allTimestamps.sort((a, b) => a - b);
+        chartData.series = alignSeries(chartData.series, chartData.allTimestamps);
+        return chartData;
+    };
+    const updateOption = (): ApexOptions => {
+        const chartData = getChartData();
+        console.log(chartData);
         return {
             series: [
                 {
@@ -71,11 +154,8 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         };
     }
 
-    const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
-
     useEffect(() => {
-        console.log(oddRequests)
-        setOptions(getOptions());
+        updateOption();
     }, [groupMarketMessage]);
 
     return (

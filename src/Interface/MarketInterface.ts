@@ -4,6 +4,7 @@ import {SportEnum} from "../Enum/SportEnum";
 import {MarketStatusEnum, OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 import WebSocket from "ws";
 import {CompetitionEnum} from "../Enum/CompetitionEnum";
+import {MarketMessageInterface} from "./LiveInterface";
 
 export interface SportInterface {
     id: number | string;
@@ -42,7 +43,7 @@ export interface MatchingMarketInterface {
     score: number;
 }
 
-export interface MarketInterface {
+export interface MarketInterface extends MarketMessageInterface {
     id: string | number;
     name: string | number;
     supplier: string;
@@ -89,6 +90,7 @@ export interface MarketRunnerInterface {
 
 export interface OddInterface {
     name: OddNameEnum; // odd value, odd volumes ...
+    label: string; // to display on chart
     type?: OddTypeEnum; // BACK, LAY for odd VALUE, Volume for odd volumes
     index?: number;
     nbValues: number;

@@ -4,6 +4,7 @@ import {
     MarketInterface,
     OddInterface,
     RemoveGroupMarketInterface,
+    RunnerInterface,
     SocketMarketInterface
 } from "../Interface/MarketInterface";
 import App from "../App";
@@ -115,11 +116,12 @@ export abstract class SupplierManager {
         this.markets = this.markets.filter(m => !marketIdsToRemove.includes(m.id));
     }
 
-    getOdd(odds: OddInterface[], name: OddNameEnum, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
+    getOdd(odds: OddInterface[], name: OddNameEnum, label: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
         let odd = odds.find(o => o.name === name && o.type === type && o.index === index);
         if (!odd) {
             odd = {
                 type: type,
+                label: label,
                 name: name,
                 nbValues: 0,
                 index: index,
@@ -128,6 +130,10 @@ export abstract class SupplierManager {
             odds.push(odd);
         }
         return odd!;
+    }
+
+    getOddLabel(runner: RunnerInterface, type: OddTypeEnum, index: number, supplier: string): string {
+        return `${runner.name}[${type}][${index}][${supplier}]`;
     }
 
     addOddValue(odd: OddInterface, value: number, time: number) {
