@@ -49,29 +49,39 @@ function PreJson({json}: JsonProps) {
     );
 }
 
-function ChartGroupMarket({groupMarketMessage}: { groupMarketMessage: GroupMarketMessageInterface }) {
-    const [options, setOptions] = useState<ApexOptions>({
-        chart: {
-            id: "basic-bar"
-        },
-        xaxis: {
-            categories: [1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999]
-        }
-    })
-    const [series, setSeries] = useState<ApexOptions["series"]>([
-        {
-            name: "series-1",
-            data: [30, 40, 45, 50, 49, 60, 70, 91]
-        }
-    ])
+function ChartGroupMarket({groupMarketMessage, oddRequests}: {
+    groupMarketMessage: GroupMarketMessageInterface,
+    oddRequests: OddRequestInterface[]
+}) {
+    const getOptions = (): ApexOptions => {
+        return {
+            series: [
+                {
+                    name: "series-1",
+                    data: [30, 40, 45, 50, 49, 60, 70, 91]
+                }
+            ],
+            chart: {
+                id: groupMarketMessage.id.toString(),
+                type: "line"
+            },
+            xaxis: {
+                categories: [1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999]
+            }
+        };
+    }
+
+    const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
+
+    useEffect(() => {
+        console.log(oddRequests)
+        setOptions(getOptions());
+    }, [groupMarketMessage]);
+
     return (
-        <div>
-            <Chart
-                options={options}
-                series={series}
-                type="line"
-            />
-        </div>
+        <>
+            {options && (<Chart options={options} series={options.series}/>)}
+        </>
     );
 }
 
@@ -96,6 +106,11 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                 }
             }
         }
+        return oddRequests;
+    };
+    const [oddRequests, setOddRequests] = useState<OddRequestInterface[]>(getOddRequests())
+
+    const sendOddRequests = () => {
         if (oddRequests.length > 0) {
             socketGroupMarkets.emit("message", {
                 type: "odds",
@@ -174,7 +189,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
     };
 
     useEffect(() => {
-        getOddRequests();
+        sendOddRequests();
         socketGroupMarkets.on("message", handleMessage);
         return () => {
             socketGroupMarkets.off("message", handleMessage);
@@ -184,7 +199,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
 
     return (
         <div>
-            <ChartGroupMarket groupMarketMessage={groupMarketMessage}/>
+            <ChartGroupMarket groupMarketMessage={groupMarketMessage} oddRequests={oddRequests}/>
         </div>
     );
 }
