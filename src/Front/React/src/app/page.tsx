@@ -312,7 +312,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                         index: newOdd.index,
                     }
                     if (oldOdd) {
-                        const currentI = newOdd.values.at(-1)?.i ?? 0;
+                        const currentI = oldOdd.values.at(-1)?.i ?? 0;
                         if (currentI + 1 < newOdd.values[0].i) {
                             oddRequests.push({
                                 i: currentI + 1,
@@ -333,7 +333,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
             return {...gm};
         })
         if (oddRequests.length > 0) {
-            console.warn("missing", oddRequests);
+            console.warn("missing oddRequests", oddRequests);
             socketGroupMarkets.emit("message", {
                 type: "odds",
                 value: oddRequests,

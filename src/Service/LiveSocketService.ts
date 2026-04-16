@@ -11,8 +11,9 @@ import {
     OddReceiveInterface,
     OddRequestInterface
 } from "../Interface/LiveInterface";
-import {OddInterface} from "../Interface/MarketInterface";
+import {MarketInterface, OddInterface} from "../Interface/MarketInterface";
 import {getOddsForOddRequest} from "./Utils";
+import {OddNameEnum} from "../Enum/MarketEnum";
 
 const clone = require('clone');
 
@@ -53,9 +54,31 @@ export default class LiveSocketService {
         });
     }
 
-    sendOddsMessage(oddRequests: OddRequestInterface[]) {
-        for (const oddRequest of oddRequests) {
-            this.io?.to(oddRequest.groupMarketId.toString()).emit("message", this.oddsMessage(oddRequests));
+    sendOddsMessage(markets: MarketInterface[]) {
+        for (const market of markets) {
+            const groupMarket = this.app.getGroupMarket(market);
+            const oddRequests: OddRequestInterface[] = [];
+            for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
+                const odds = marketRunner.odds.filter(o =>
+                    o.nbValues < o.values.length &&
+                    o.index === 0 &&
+                    o.name === OddNameEnum.RunnerOddValue
+                );
+                for (const odd of odds) {
+                    oddRequests.push({
+                        groupMarketId: groupMarket.id,
+                        i: odd.nbValues,
+                        index: odd.index,
+                        marketId: market.id,
+                        name: odd.name,
+                        path: `marketRunners[${indexMarketRunner}].odds`,
+                        supplier: odd.supplier,
+                        type: odd.type,
+                    });
+                    odd.nbValues = odd.values.length;
+                }
+            }
+            this.io?.to(groupMarket.id.toString()).emit("message", this.oddsMessage(oddRequests));
         }
     }
 
@@ -115,22 +138,17 @@ export default class LiveSocketService {
         return oddReceives;
     }
 
-    private joinRooms(socket: Socket, groupMarketIds: string[]) {
+    private joinRooms(socket: Socket, groupMarketIds: number[]) {
+        const targetRooms = new Set(groupMarketIds.map(String));
         const currentRooms = new Set(socket.rooms);
-        currentRooms.delete(socket.id); // Ignore private room
+        currentRooms.delete(socket.id);
 
-        const roomsToLeave = [...currentRooms].filter(room => !groupMarketIds.includes(room));
-        const roomsToJoin = groupMarketIds.filter(room => !currentRooms.has(room));
-
-        // Leave rooms that are not in marketIds
-        for (const room of roomsToLeave) {
-            socket.leave(room);
+        for (const room of currentRooms) {
+            if (!targetRooms.has(room)) socket.leave(room);
         }
 
-        // Join rooms that are not already joined
-        for (const room of roomsToJoin) {
-            socket.join(room);
+        for (const room of targetRooms) {
+            if (!currentRooms.has(room)) socket.join(room);
         }
     }
-
 }

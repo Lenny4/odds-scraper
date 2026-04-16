@@ -495,6 +495,7 @@ export default class ScrapSocketTask {
                 }
             }
         }
+        this.orbitxManager.app.liveSocketService.sendOddsMessage([market])
     }
 
     private switchOnWaitingSocketMarket(socketMarket: SocketMarketInterface) {

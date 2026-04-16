@@ -248,8 +248,10 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         ) {
             return false;
         }
+        const markets: MarketInterface[] = [];
         for (const initialDump of initialDumps) {
             const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
+            markets.push(market);
             market.modificationsOnMarket.push(now);
             const marketRunner = market.marketRunners.find(mr => mr.runnerId === initialDump.asset_id)!;
             const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
@@ -274,6 +276,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 }
             }
         }
+        this.app.liveSocketService.sendOddsMessage(markets);
         return true;
     }
 

@@ -23,7 +23,7 @@ export default class Dashboard {
         console.log(`Dashboard server running on port ${port}`);
 
         io.on('connection', (socket) => {
-            console.log('Client connected:', socket.id);
+            // nothing
         });
 
         this.intervalBroadcast = setInterval(async () => {

@@ -58,6 +58,10 @@ export default class App {
         this.liveSocketService.start()
     }
 
+    getGroupMarket(market: MarketInterface) {
+        return this.groupMarkets.find(gm => gm.markets.find(m => m.id === market.id && m.supplier === market.supplier))!;
+    }
+
     getCompetitionEnum(market: MarketInterface, supplier: string) {
         return this.competitionMapping.find(c =>
             c.values.find(v =>
