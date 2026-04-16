@@ -15,11 +15,13 @@ import {OddInterface} from "../../../../Interface/MarketInterface";
 import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
 import {ChartDataInterface, SerieColorInterface, SerieInterface} from "@/interface/ChartInterface";
-import {OddNameEnum} from "../../../../Enum/MarketEnum";
+import {OddNameEnum, OddTypeEnum} from "../../../../Enum/MarketEnum";
 
 type JsonProps = {
     json: unknown;
 }
+
+let applyZoomXaxis = true;
 
 function linkifyJsonString(json: unknown): string {
     const jsonString = JSON.stringify(json, null, 2);
@@ -56,6 +58,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     oddRequests: OddRequestInterface[]
 }) {
     const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
+    const [xaxis, setXaxis] = useState<ApexOptions['xaxis'] | undefined>(undefined)
 
     const alignSeries = (series: SerieInterface[], allTimestamps: number[]) => {
         return series.map(serie => {
@@ -155,6 +158,18 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         chartData.series = alignSeries(chartData.series, chartData.allTimestamps);
         return chartData;
     };
+
+    const updateXaxis = (xaxis: { min: number; max: number; } | undefined) => {
+        if (xaxis === undefined) {
+            setXaxis(undefined);
+        } else {
+            setXaxis({
+                type: 'datetime',
+                ...xaxis
+            });
+        }
+    };
+
     const updateOption = () => {
         const chartData = getChartData();
         const duration = Math.abs(chartData.allTimestamps[0] - chartData.allTimestamps[chartData.allTimestamps.length - 1]);
@@ -189,6 +204,21 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     autoScaleYaxis: true, // Optional: rescale y-axis on zoom
                     allowMouseWheelZoom: false,
                 },
+                events: {
+                    scrolled: (chart, {xaxis}: { xaxis: { min: number; max: number; } }) => {
+                        updateXaxis(xaxis)
+                    },
+                    zoomed: (chart, {xaxis}: { xaxis: { min: number; max: number; } }) => {
+                        if (applyZoomXaxis) {
+                            updateXaxis(xaxis)
+                        }
+                        applyZoomXaxis = true;
+                    },
+                    beforeResetZoom: (chart) => {
+                        applyZoomXaxis = false;
+                        updateXaxis(undefined)
+                    },
+                },
             },
             colors: chartData.series.map(s => {
                 return `rgba(${s.color.r}, ${s.color.g}, ${s.color.b}, ${s.color.a})`
@@ -202,7 +232,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             markers: {
                 size: 0
             },
-            xaxis: {
+            xaxis: xaxis ?? {
                 type: 'datetime',
                 min: Math.round(chartData.xMin! - duration * 0.02),
                 max: Math.round(chartData.xMax! + duration * 0.02)
@@ -236,7 +266,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
 
     useEffect(() => {
         updateOption();
-    }, [groupMarketMessage]);
+    }, [groupMarketMessage, xaxis]);
 
     return (
         <>
@@ -255,6 +285,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                 groupMarketId: groupMarketMessage.id,
                 marketId: market.id,
                 name: OddNameEnum.RunnerOddValue,
+                type: OddTypeEnum.Lay,
                 path: "",
                 supplier: market.supplier,
                 index: 0,
@@ -333,7 +364,6 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
             return {...gm};
         })
         if (oddRequests.length > 0) {
-            console.warn("missing oddRequests", oddRequests);
             socketGroupMarkets.emit("message", {
                 type: "odds",
                 value: oddRequests,
