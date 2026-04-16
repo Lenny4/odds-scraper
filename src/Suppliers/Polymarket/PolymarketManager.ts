@@ -42,6 +42,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             value: OddTypeEnum.Lay,
         },
     ]
+    readonly maxOpenTime: number = 3600 * 1000;
 
     constructor(app: App) {
         super(app)
@@ -144,90 +145,114 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         return null;
     }
 
+    private closeSocketMarket(socketMarket: SocketMarketInterface) {
+        socketMarket.closing = true;
+        if (
+            socketMarket?.websocket &&
+            (socketMarket.websocket.readyState === WebSocket.CONNECTING || socketMarket.websocket.readyState === WebSocket.OPEN)
+        ) {
+            socketMarket.websocket.close();
+        }
+        this.socketMarkets = this.socketMarkets.filter(sm => sm.id !== socketMarket.id);
+    }
+
     private async connectMarkets() {
+        const now = Date.now();
         if (this.markets.length === 0) {
             for (const socketMarket of this.socketMarkets) {
-                if (
-                    socketMarket?.websocket &&
-                    (socketMarket.websocket.readyState === WebSocket.CONNECTING || socketMarket.websocket.readyState === WebSocket.OPEN)
-                ) {
-                    socketMarket.websocket.close();
+                this.closeSocketMarket(socketMarket);
+            }
+        } else if (this.socketMarkets.length === 0) {
+            this.createSocketMarket();
+        } else {
+            for (const socketMarket of this.socketMarkets) {
+                if (socketMarket.open !== null && socketMarket.open + this.maxOpenTime < now) {
+                    this.createSocketMarket(socketMarket.id);
                 }
             }
-            this.socketMarkets = [];
-        } else if (this.socketMarkets.length === 0) {
-            this.socketMarketId++;
-            const socketMarket: SocketMarketInterface = {
-                id: this.socketMarketId,
-                markets: [],
-                pingInterval: null,
-                closing: false,
-                nbModificationsOnMarkets: 0,
-                canListen: true,
-                websocket: new WebSocket("wss://ws-subscriptions-clob.polymarket.com/ws/market", {}),
-                open: null,
-                lastReceivedMessage: undefined,
-                oldMarketIds: [],
-            };
-            this.socketMarkets.push(socketMarket)
-            socketMarket.websocket!.on('open', async () => {
-                socketMarket!.open = Date.now();
-                await this.sendMarkets();
-                socketMarket!.pingInterval = setInterval(async () => {
-                    socketMarket!.websocket!.send("PING");
-                }, 10_000);
-            });
-            socketMarket.websocket!.on('error', (e) => {
-                console.error("[PolymarketTask] websocket on error", e);
-                DiscordService.send(JSON.stringify({
-                    event: "websocket.on('error' connectMarkets",
-                    name: e.name,
-                    message: e.message,
-                }))
-            });
-            socketMarket.websocket!.on('close', () => { // each time error is called -> close is also call
-                if (socketMarket!.pingInterval) {
-                    clearInterval(socketMarket!.pingInterval);
-                }
-                this.connectMarkets();
-            });
-            socketMarket.websocket!.on('message', (data: Buffer) => {
-                let result: any = data.toString();
-                socketMarket.lastReceivedMessage = Date.now();
-                try {
-                    result = JSON.parse(result);
-                    if (
-                        !this.ignoreMessage(result) &&
-                        !this.handleMessageInitialDump(result)
-                    ) {
-                        console.warn("new message 1", result);
-                        DiscordService.send(JSON.stringify({
-                            event: "no handle",
-                            message: data,
-                        }));
-                    }
-                    this.removeModificationsOnMarkets(this.markets);
-                    return;
-                } catch (e) {
-                    // nothing
-                }
-                if (result === "PONG") {
-                    return;
-                }
-                console.warn("new message 2", result)
-                DiscordService.send(JSON.stringify({
-                    event: "no handle",
-                    message: data,
-                }));
-            });
-        } else {
             await this.sendMarkets();
         }
+    }
+
+    private createSocketMarket(replaceSocketMarketId: number | undefined = undefined) {
+        this.socketMarketId++;
+        const socketMarket: SocketMarketInterface = {
+            id: this.socketMarketId,
+            markets: [],
+            pingInterval: null,
+            closing: false,
+            nbModificationsOnMarkets: 0,
+            canListen: true,
+            websocket: new WebSocket("wss://ws-subscriptions-clob.polymarket.com/ws/market"),
+            open: null,
+            lastReceivedMessage: undefined,
+            oldMarketIds: [],
+            replaceSocketMarketId: replaceSocketMarketId,
+        };
+        this.socketMarkets.push(socketMarket)
+        socketMarket.websocket!.on('open', async () => {
+            socketMarket!.open = Date.now();
+            await this.sendMarkets();
+            if (socketMarket.replaceSocketMarketId) {
+                this.closeSocketMarket(this.socketMarkets.find(sm => sm.id === socketMarket.replaceSocketMarketId)!);
+            }
+            socketMarket!.pingInterval = setInterval(async () => {
+                socketMarket!.websocket!.send("PING");
+            }, 10_000);
+        });
+        socketMarket.websocket!.on('error', (e) => {
+            console.error("[PolymarketTask] websocket on error", e);
+            DiscordService.send(JSON.stringify({
+                event: "websocket.on('error' connectMarkets",
+                name: e.name,
+                message: e.message,
+            }))
+        });
+        socketMarket.websocket!.on('close', (code) => { // each time error is called -> close is also call
+            console.log("[PolymarketTask] close", code);
+            if (socketMarket!.pingInterval) {
+                clearInterval(socketMarket!.pingInterval);
+            }
+            this.socketMarkets = this.socketMarkets.filter(sm => socketMarket.id !== sm.id);
+            if (!socketMarket.closing) {
+                this.connectMarkets();
+            }
+        });
+        socketMarket.websocket!.on('message', (data: Buffer) => {
+            let result: any = data.toString();
+            socketMarket.lastReceivedMessage = Date.now();
+            try {
+                result = JSON.parse(result);
+                if (
+                    !this.ignoreMessage(result) &&
+                    !this.handleMessageInitialDump(result)
+                ) {
+                    console.warn("new message 1", result);
+                    DiscordService.send(JSON.stringify({
+                        event: "no handle",
+                        message: data,
+                    }));
+                }
+                this.removeModificationsOnMarkets(this.markets);
+                return;
+            } catch (e) {
+                // nothing
+            }
+            if (result === "PONG") {
+                return;
+            }
+            console.warn("new message 2", result)
+            DiscordService.send(JSON.stringify({
+                event: "no handle",
+                message: data,
+            }));
+        });
     }
 
     private ignoreMessage(data: any): boolean {
         return data.hasOwnProperty("event_type") && (
             data.event_type === "last_trade_price" ||
+            data.event_type === "tick_size_change" ||
             data.event_type === "price_change"
         );
     }

@@ -125,7 +125,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     color: getColor(odd)
                 };
                 for (const oddValue of odd.values) {
-                    const v = oddValue.v / 1000;
+                    const v = Math.round(oddValue.v / 10) / 100;
                     const t = oddValue.t;
                     serie.values.push(v);
                     serie.times.push(t);
@@ -285,13 +285,16 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                 groupMarketId: groupMarketMessage.id,
                 marketId: market.id,
                 name: OddNameEnum.RunnerOddValue,
-                type: OddTypeEnum.Lay,
+                type: OddTypeEnum.Back,
                 path: "",
                 supplier: market.supplier,
                 index: 0,
             };
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
-                if (indexMarketRunner === 0 && marketRunner.odds.length === 0) {
+                if (
+                    indexMarketRunner === 1 &&
+                    marketRunner.odds.length === 0
+                ) {
                     oddRequests.push({
                         ...defaultOddRequest,
                         path: `marketRunners[${indexMarketRunner}].odds`,

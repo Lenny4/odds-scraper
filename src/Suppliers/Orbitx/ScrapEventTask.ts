@@ -191,6 +191,9 @@ export default class ScrapEventTask {
                         }
                     }
                     isConnected = await this.isConnected(pageLogIn);
+                    if (isConnected) {
+                        console.log("login Orbitx isConnected !")
+                    }
                 }
                 let connectedUntilCounter = 0;
                 while (this.orbitxManager.connectedUntil === null) {
