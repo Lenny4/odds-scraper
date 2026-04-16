@@ -109,7 +109,7 @@ export interface GroupMarketInterface {
     markets: MarketInterface[];
 }
 
-export interface RemoveGroupMarketInterface {
+export interface RemoveMarketInterface {
     id: string | number;
     supplier: string;
 }

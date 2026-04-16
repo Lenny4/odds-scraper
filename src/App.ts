@@ -8,13 +8,14 @@ import {
     GroupMarketInterface,
     MarketInterface,
     MatchingMarketInterface,
-    RemoveGroupMarketInterface
+    RemoveMarketInterface
 } from "./Interface/MarketInterface";
 import {SupplierManager} from "./Suppliers/SupplierManager";
 import {CompetitionEnum} from "./Enum/CompetitionEnum";
 import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
 import stringSimilarity from "string-similarity";
 import LiveSocketService from "./Service/LiveSocketService";
+import {SupplierInterface} from "./Interface/SupplierInterface";
 
 export default class App {
     static readonly checkMarketModificationOnLast: number = 5 * 60_000;
@@ -58,8 +59,8 @@ export default class App {
         this.liveSocketService.start()
     }
 
-    getGroupMarket(market: MarketInterface) {
-        return this.groupMarkets.find(gm => gm.markets.find(m => m.id === market.id && m.supplier === market.supplier))!;
+    getGroupMarket(marketId: number | string, supplier: string) {
+        return this.groupMarkets.find(gm => gm.markets.find(m => m.id === marketId && m.supplier === supplier))!;
     }
 
     getCompetitionEnum(market: MarketInterface, supplier: string) {
@@ -77,7 +78,7 @@ export default class App {
             const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
             const matchingMarket = this.findMatchingMarket(market, markets);
             if (matchingMarket) {
-                const groupMarket = this.groupMarkets.find(gm => gm.markets.find(m => m.id === matchingMarket.id));
+                const groupMarket = this.getGroupMarket(matchingMarket.id, matchingMarket.supplier);
                 if (groupMarket) {
                     groupMarket.markets.push(market);
                     return groupMarket;
@@ -125,21 +126,28 @@ export default class App {
         return null;
     }
 
-    removeGroupMarkets(removeGroupMarkets: RemoveGroupMarketInterface[]) {
-        for (const removeGroupMarket of removeGroupMarkets) {
-            for (const [indexGroupMarket, groupMarket] of this.groupMarkets.entries()) {
-                const index = groupMarket.markets.findIndex(m => m.supplier === removeGroupMarket.supplier && m.id === removeGroupMarket.id);
-                if (index >= 0) {
-                    groupMarket.markets.splice(index, 1);
-                    if (groupMarket.markets.length === 0) {
-                        this.groupMarkets.splice(indexGroupMarket, 1);
-                    }
-                    break;
-                }
+    removeGroupMarkets(removeMarkets: RemoveMarketInterface[]) {
+        for (const removeMarket of removeMarkets) {
+            const groupMarket = this.getGroupMarket(removeMarket.id, removeMarket.supplier);
+            // Copier la liste pour éviter mutation pendant itération
+            const marketsToRemove = [...groupMarket.markets];
+            for (const market of marketsToRemove) {
+                const supplierManager = Object.values(this).find(
+                    sm => sm instanceof SupplierManager && sm.name === market.supplier
+                ) as SupplierInterface;
+                // Suppression côté supplier
+                supplierManager.markets = supplierManager.markets.filter(m => m.id !== market.id);
+            }
+            // Suppression côté group en une seule fois
+            groupMarket.markets = groupMarket.markets.filter(
+                m => !marketsToRemove.some(rm => rm.id === m.id)
+            );
+            // Nettoyage des groupes vides
+            if (groupMarket.markets.length === 0) {
+                this.groupMarkets = this.groupMarkets.filter(gm => gm.id !== groupMarket.id);
             }
         }
     }
-
     async stop() {
         // todo
     }

@@ -2,14 +2,14 @@
 
 import App from "../App";
 import {Db, MongoClient, ServerApiVersion} from "mongodb";
-import {MarketInterface} from "../Interface/MarketInterface";
+import {GroupMarketInterface} from "../Interface/MarketInterface";
 import DiscordService from "./DiscordService";
 
 export default class MongoService {
     public app: App;
     public orbitxDb: Db | null = null;
     public connected: boolean = false;
-    public marketCollectionName = 'markets';
+    public marketCollectionName = 'groupMarkets';
     public sofascoreCollectionName = 'sofascore';
 
     constructor(app: App) {
@@ -24,7 +24,7 @@ export default class MongoService {
         }
     }
 
-    public async saveMarket(market: MarketInterface) {
+    public async saveGroupMarket(groupMarket: GroupMarketInterface) {
         if (!this.connected) {
             const message = "Mongo DB not connected";
             console.error(message);
@@ -35,7 +35,7 @@ export default class MongoService {
             const nbAttempt = 3;
             for (let attempt = 0; attempt <= nbAttempt; attempt++) {
                 try {
-                    await this.orbitxDb!.collection(this.marketCollectionName).insertOne(market);
+                    await this.orbitxDb!.collection(this.marketCollectionName).insertOne(groupMarket);
                     break;
                 } catch (e: any) {
                     const errorMessage = e.toString();
@@ -44,7 +44,7 @@ export default class MongoService {
                         !errorMessage.includes('Error: read ECONNRESET')
                     ) {
                         const message = "collection insertOne " + JSON.stringify({
-                            id: market.id,
+                            id: groupMarket.id,
                             error: errorMessage,
                         });
                         console.error(message);

@@ -3,7 +3,7 @@
 import {
     MarketInterface,
     OddInterface,
-    RemoveGroupMarketInterface,
+    RemoveMarketInterface,
     RunnerInterface,
     SocketMarketInterface
 } from "../Interface/MarketInterface";
@@ -93,27 +93,30 @@ export abstract class SupplierManager {
         if (marketsToRemove.length === 0) {
             return;
         }
-        const removeGroupMarkets: RemoveGroupMarketInterface[] = [];
+        const removeMarkets: RemoveMarketInterface[] = [];
         for (const market of marketsToRemove) {
             // Set `isSaving` to `true` before any asynchronous operations to ensure
             // that other processes calling this function will recognize these markets
             // as already being processed, avoiding concurrent modifications.
             market.isSaving = true;
-            removeGroupMarkets.push({
+            removeMarkets.push({
                 supplier: market.supplier,
                 id: market.id,
             })
         }
-        for (const market of marketsToRemove) {
-            market.modificationsOnMarket = [];
-            market.deleted = time;
-            await this.app.mongoService!.saveMarket(market);
-            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-                console.info("Market added in Mongo and removed from this.markets", this.marketToString(market));
+        for (const removeMarket of removeMarkets) {
+            const groupMarket = this.app.getGroupMarket(removeMarket.id, removeMarket.supplier);
+            for (const market of groupMarket.markets) {
+                market.modificationsOnMarket = [];
+                market.deleted = time;
             }
+            this.app.mongoService!.saveGroupMarket(groupMarket).then(() => {
+                if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+                    console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
+                }
+            });
         }
-        this.app.removeGroupMarkets(removeGroupMarkets);
-        this.markets = this.markets.filter(m => !marketIdsToRemove.includes(m.id));
+        this.app.removeGroupMarkets(removeMarkets);
     }
 
     getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {

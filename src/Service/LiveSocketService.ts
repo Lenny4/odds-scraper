@@ -56,7 +56,7 @@ export default class LiveSocketService {
 
     sendOddsMessage(markets: MarketInterface[]) {
         for (const market of markets) {
-            const groupMarket = this.app.getGroupMarket(market);
+            const groupMarket = this.app.getGroupMarket(market.id, market.supplier);
             const oddRequests: OddRequestInterface[] = [];
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
                 const odds = marketRunner.odds.filter(o =>
