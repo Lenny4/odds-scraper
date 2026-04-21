@@ -154,6 +154,24 @@ export abstract class SupplierManager {
         this._addMarket(market);
     }
 
+    _canScrapMarket(market: MarketInterface): boolean {
+        const now = Date.now();
+        const liveCompetitions = (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum));
+        return (
+            !this.getMarketIsFinish(market) &&
+            (
+                (
+                    ["match odds", "moneyline"].includes(market.name.toString().toLowerCase()) &&
+                    (market.startTime - (2 * 3600 * 1000) < now || liveCompetitions)
+                ) ||
+                (market.totalMatched > 20_000 || liveCompetitions) // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
+            ) &&
+            market.numberOfWinners === 1 &&
+            (now + (15 * 60 * 1000) < market.startTime || liveCompetitions) &&
+            [2, 3].includes(market.runners.length)
+        );
+    }
+
     async removeMarkets(ids: (string | number)[], time: number): Promise<void> {
         await this._removeMarkets(ids, time);
     }

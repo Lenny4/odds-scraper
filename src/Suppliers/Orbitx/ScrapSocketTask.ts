@@ -312,6 +312,7 @@ export default class ScrapSocketTask {
             canListen: false,
             lastReceivedMessage: undefined,
             pingInterval: null,
+            closeTimeout: null,
         };
         newSocketMarket.websocket = await this.createWebsocketForSocketMarket(browser, newSocketMarket)
         return newSocketMarket;

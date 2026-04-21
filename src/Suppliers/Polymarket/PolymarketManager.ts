@@ -77,7 +77,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     canScrapMarket(market: MarketInterface): boolean {
-        return market.name === "moneyline";
+        return this._canScrapMarket(market) && market.name === "moneyline";
     }
 
     transformApiMarketToMarket({
@@ -166,11 +166,13 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             this.createSocketMarket();
         } else {
             for (const socketMarket of this.socketMarkets) {
+                if (socketMarket.closing) {
+                    continue;
+                }
                 if (socketMarket.open !== null && socketMarket.open + this.maxOpenTime < now) {
                     this.createSocketMarket(socketMarket.id);
                 }
             }
-            await this.sendMarkets();
         }
     }
 
@@ -180,6 +182,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             id: this.socketMarketId,
             markets: [],
             pingInterval: null,
+            closeTimeout: null,
             closing: false,
             nbModificationsOnMarkets: 0,
             canListen: true,
@@ -199,6 +202,9 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             socketMarket!.pingInterval = setInterval(async () => {
                 socketMarket!.websocket!.send("PING");
             }, 10_000);
+            socketMarket!.closeTimeout = setInterval(async () => {
+                this.connectMarkets();
+            }, this.maxOpenTime);
         });
         socketMarket.websocket!.on('error', (e) => {
             console.error("[PolymarketTask] websocket on error", e);
@@ -212,6 +218,9 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             console.log("[PolymarketTask] close", code);
             if (socketMarket!.pingInterval) {
                 clearInterval(socketMarket!.pingInterval);
+            }
+            if (socketMarket!.closeTimeout) {
+                clearTimeout(socketMarket!.closeTimeout);
             }
             this.socketMarkets = this.socketMarkets.filter(sm => socketMarket.id !== sm.id);
             if (!socketMarket.closing) {
@@ -307,6 +316,9 @@ export default class PolymarketManager extends SupplierManager implements Suppli
 
     private async sendMarkets() {
         for (const socketMarket of this.socketMarkets) {
+            if (socketMarket.closing || socketMarket.websocket?.readyState !== WebSocket.OPEN) {
+                continue;
+            }
             if (socketMarket!.markets.length === 0) {
                 socketMarket!.websocket!.send(JSON.stringify({
                     "assets_ids": this.markets.flatMap(m => m.clobTokenIds),

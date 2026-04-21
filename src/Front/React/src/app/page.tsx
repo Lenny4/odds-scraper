@@ -1,8 +1,8 @@
 "use client"
 
 import React, {useEffect, useState} from "react";
-import {Accordion, AccordionDetails, AccordionSummary, Typography} from "@mui/material";
-import {DetailAppInterface} from "../../../../Interface/AppInterface";
+import {Accordion, AccordionDetails, AccordionSummary, Box, Typography} from "@mui/material";
+import {DetailAppInterface, SocketMarketDetailChildInterface} from "../../../../Interface/AppInterface";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
     GroupMarketMessageInterface,
@@ -16,6 +16,9 @@ import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
 import {ChartDataInterface, SerieColorInterface, SerieInterface} from "@/interface/ChartInterface";
 import {OddNameEnum, OddTypeEnum} from "../../../../Enum/MarketEnum";
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import {CustomTabPanel} from "@/app/component/CustomTabPanel";
 
 type JsonProps = {
     json: unknown;
@@ -400,11 +403,25 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
     );
 }
 
+function SocketMarket({socketMarket}: { socketMarket: SocketMarketDetailChildInterface }) {
+    return (
+        <div>
+            <PreJson json={socketMarket}/>
+        </div>
+    );
+}
+
 export default function Home() {
     const [detailApp, setDetailApp] = useState<DetailAppInterface | undefined>(undefined)
-    const [openGroupMarkets, setOpenGroupMarkets] = useState<number[]>([])
+    const [openGroupMarkets, setOpenGroupMarkets] = useState<number[]>([]);
 
-    const handleChange = (id: number) => {
+    const [value, setValue] = React.useState(0);
+
+    const handleChangeTab = (event: React.SyntheticEvent, newValue: number) => {
+        setValue(newValue);
+    };
+
+    const handleChangeAccordion = (id: number) => {
         setOpenGroupMarkets(prev =>
             prev.includes(id) ? prev.filter(gmId => gmId !== id) : [...prev, id]
         );
@@ -440,28 +457,50 @@ export default function Home() {
 
     return (
         <main>
-            {detailApp.groupMarkets.sort((a, b) => {
-                return b.markets.length - a.markets.length;
-            }).map(gm => {
-                const market = gm.markets[0];
-                const suppliers = gm.markets.map(m => m.supplier);
-                return (
-                    <Accordion
-                        key={gm.id}
-                        expanded={openGroupMarkets.includes(gm.id)}
-                        onChange={() => handleChange(gm.id)}
-                    >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon/>}>
-                            <Typography component="span">
-                                {`${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)}`}
-                            </Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                            {openGroupMarkets.includes(gm.id) && <GroupMarket initGroupMarketMessage={gm}/>}
-                        </AccordionDetails>
-                    </Accordion>
-                )
-            })}
+            <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+                <Tabs value={value} onChange={handleChangeTab} aria-label="basic tabs example">
+                    <Tab label="Markets"/>
+                    <Tab label="Socket Markets"/>
+                </Tabs>
+            </Box>
+            <CustomTabPanel value={value} index={0}>
+                {detailApp.groupMarkets.sort((a, b) => {
+                    return b.markets.length - a.markets.length;
+                }).map(gm => {
+                    const market = gm.markets[0];
+                    const suppliers = gm.markets.map(m => m.supplier);
+                    return (
+                        <Accordion
+                            key={gm.id}
+                            expanded={openGroupMarkets.includes(gm.id)}
+                            onChange={() => handleChangeAccordion(gm.id)}
+                        >
+                            <AccordionSummary expandIcon={<ExpandMoreIcon/>}>
+                                <Typography component="span">
+                                    {`${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)}`}
+                                </Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                                {openGroupMarkets.includes(gm.id) && <GroupMarket initGroupMarketMessage={gm}/>}
+                            </AccordionDetails>
+                        </Accordion>
+                    )
+                })}
+            </CustomTabPanel>
+            <CustomTabPanel value={value} index={1}>
+                {detailApp.socketMarkets.map((socketMarket) => {
+                    return (
+                        <Box key={socketMarket.name}>
+                            <Typography>{socketMarket.name}</Typography>
+                            {socketMarket.socketMarkets.map(sm => {
+                                return (
+                                    <SocketMarket key={sm.id} socketMarket={sm}/>
+                                )
+                            })}
+                        </Box>
+                    )
+                })}
+            </CustomTabPanel>
         </main>
     );
 }

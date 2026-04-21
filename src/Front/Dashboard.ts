@@ -2,7 +2,7 @@ import App from "../App";
 import {Server} from "socket.io";
 import humanizeDuration from "humanize-duration";
 import {SupplierManager} from "../Suppliers/SupplierManager";
-import {DetailAppInterface} from "../Interface/AppInterface";
+import {DetailAppInterface, SocketMarketDetailChildInterface} from "../Interface/AppInterface";
 import {GroupMarketMessageInterface, MarketMessageInterface} from "../Interface/LiveInterface";
 
 export default class Dashboard {
@@ -70,7 +70,8 @@ export default class Dashboard {
                 return {
                     name: supplierManager.name,
                     socketMarkets: supplierManager.socketMarkets.map(socketMarket => {
-                        return {
+                        const socketMarketDetailChild: SocketMarketDetailChildInterface = {
+                            id: socketMarket.id,
                             markets: socketMarket.markets.map(m => m.id),
                             newNbModificationsOnMarkets: socketMarket.markets.reduce((sum, m) => {
                                 return sum + (m?.modificationsOnMarket?.length || 0);
@@ -83,6 +84,7 @@ export default class Dashboard {
                                 }),
                             }),
                         }
+                        return socketMarketDetailChild
                     }),
                 }
             }),

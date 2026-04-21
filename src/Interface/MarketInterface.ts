@@ -130,6 +130,7 @@ export interface SocketMarketInterface {
     nbModificationsOnMarkets: number;
     lastReceivedMessage: number | undefined;
     pingInterval: NodeJS.Timeout | null;
+    closeTimeout: NodeJS.Timeout | null;
     replaceSocketMarketId?: number;
 }
 
