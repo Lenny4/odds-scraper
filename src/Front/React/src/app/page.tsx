@@ -9,7 +9,6 @@ import {
     OddReceiveInterface,
     OddRequestInterface
 } from "../../../../Interface/LiveInterface";
-import {socketDetails, socketGroupMarkets} from "@/app/sockets";
 import {getOddsForOddRequest, getValueByPath} from "../../../../Service/Utils";
 import {OddInterface} from "../../../../Interface/MarketInterface";
 import Chart from "react-apexcharts";
@@ -19,6 +18,7 @@ import {OddNameEnum, OddTypeEnum} from "../../../../Enum/MarketEnum";
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import {CustomTabPanel} from "@/app/component/CustomTabPanel";
+import {getSocketDetails, getSocketGroupMarkets} from "@/app/sockets";
 
 type JsonProps = {
     json: unknown;
@@ -311,7 +311,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
 
     const sendOddRequests = () => {
         if (oddRequests.length > 0) {
-            socketGroupMarkets.emit("message", {
+            getSocketGroupMarkets().emit("message", {
                 type: "odds",
                 value: oddRequests,
             });
@@ -370,7 +370,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
             return {...gm};
         })
         if (oddRequests.length > 0) {
-            socketGroupMarkets.emit("message", {
+            getSocketGroupMarkets().emit("message", {
                 type: "odds",
                 value: oddRequests,
             });
@@ -389,6 +389,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
 
     useEffect(() => {
         sendOddRequests();
+        const socketGroupMarkets = getSocketGroupMarkets();
         socketGroupMarkets.on("message", handleMessage);
         return () => {
             socketGroupMarkets.off("message", handleMessage);
@@ -428,13 +429,14 @@ export default function Home() {
     };
 
     useEffect(() => {
-        socketGroupMarkets.emit("message", {
+        getSocketGroupMarkets().emit("message", {
             type: "join",
             value: openGroupMarkets
         });
     }, [openGroupMarkets]);
 
     useEffect(() => {
+        const socketDetails = getSocketDetails();
         socketDetails.on('connect', () => {
             // nothing
         });
