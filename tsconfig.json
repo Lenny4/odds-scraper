@@ -118,7 +118,8 @@
     /* Skip type checking all .d.ts files. */
   },
   "exclude": [
-    "ecosystem.config.js"
+    "ecosystem.config.js",
+    "src/Front/React",
     /* Cannot write file '/app/ecosystem.config.js' because it would overwrite input file. */
   ]
 }
