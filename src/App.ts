@@ -7,8 +7,7 @@ import {
     CompetitionMappingInterface,
     GroupMarketInterface,
     MarketInterface,
-    MatchingMarketInterface,
-    RemoveMarketInterface
+    MatchingMarketInterface
 } from "./Interface/MarketInterface";
 import {SupplierManager} from "./Suppliers/SupplierManager";
 import {CompetitionEnum} from "./Enum/CompetitionEnum";
@@ -133,9 +132,8 @@ export default class App {
         return null;
     }
 
-    removeGroupMarkets(removeMarkets: RemoveMarketInterface[]) {
-        for (const removeMarket of removeMarkets) {
-            const groupMarket = this.getGroupMarket(removeMarket.id, removeMarket.supplier);
+    removeGroupMarkets(groupMarkets: GroupMarketInterface[]) {
+        for (const groupMarket of groupMarkets) {
             // Copier la liste pour éviter mutation pendant itération
             const marketsToRemove = [...groupMarket.markets];
             for (const market of marketsToRemove) {
@@ -155,6 +153,7 @@ export default class App {
             }
         }
     }
+
     async stop() {
         // todo
     }

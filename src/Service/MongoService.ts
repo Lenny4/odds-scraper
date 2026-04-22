@@ -24,7 +24,7 @@ export default class MongoService {
         }
     }
 
-    public async saveGroupMarket(groupMarket: GroupMarketInterface) {
+    public async saveGroupMarket(groupMarket: GroupMarketInterface, time: number) {
         if (!this.connected) {
             const message = "Mongo DB not connected";
             console.error(message);
@@ -35,6 +35,10 @@ export default class MongoService {
             const nbAttempt = 3;
             for (let attempt = 0; attempt <= nbAttempt; attempt++) {
                 try {
+                    for (const market of groupMarket.markets) {
+                        market.modificationsOnMarket = [];
+                        market.deleted = time;
+                    }
                     await this.orbitxDb!.collection(this.marketCollectionName).insertOne(groupMarket);
                     break;
                 } catch (e: any) {

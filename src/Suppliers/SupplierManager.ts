@@ -1,9 +1,9 @@
 'use strict';
 
 import {
+    GroupMarketInterface,
     MarketInterface,
     OddInterface,
-    RemoveMarketInterface,
     RunnerInterface,
     SocketMarketInterface
 } from "../Interface/MarketInterface";
@@ -92,29 +92,22 @@ export abstract class SupplierManager {
         if (marketsToRemove.length === 0) {
             return;
         }
-        const removeMarkets: RemoveMarketInterface[] = [];
         for (const market of marketsToRemove) {
             // Set `isSaving` to `true` before any asynchronous operations to ensure
             // that other processes calling this function will recognize these markets
             // as already being processed, avoiding concurrent modifications.
             market.isSaving = true;
-            removeMarkets.push({
-                supplier: market.supplier,
-                id: market.id,
-            })
         }
-        for (const removeMarket of removeMarkets) {
+        const groupMarkets: GroupMarketInterface[] = [];
+        for (const removeMarket of marketsToRemove) {
             const groupMarket = this.app.getGroupMarket(removeMarket.id, removeMarket.supplier);
-            for (const market of groupMarket.markets) {
-                market.modificationsOnMarket = [];
-                market.deleted = time;
-            }
-            await this.app.mongoService!.saveGroupMarket(groupMarket);
+            groupMarkets.push(groupMarket);
+            await this.app.mongoService!.saveGroupMarket(groupMarket, time);
             if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
                 console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
             }
         }
-        this.app.removeGroupMarkets(removeMarkets);
+        this.app.removeGroupMarkets(groupMarkets);
     }
 
     getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {

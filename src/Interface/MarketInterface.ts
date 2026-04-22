@@ -110,11 +110,6 @@ export interface GroupMarketInterface {
     markets: MarketInterface[];
 }
 
-export interface RemoveMarketInterface {
-    id: string | number;
-    supplier: string;
-}
-
 export interface TypeMappingInterface {
     prop: string;
     value: OddTypeEnum;
