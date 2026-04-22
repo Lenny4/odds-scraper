@@ -110,11 +110,10 @@ export abstract class SupplierManager {
                 market.modificationsOnMarket = [];
                 market.deleted = time;
             }
-            this.app.mongoService!.saveGroupMarket(groupMarket).then(() => {
-                if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-                    console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
-                }
-            });
+            await this.app.mongoService!.saveGroupMarket(groupMarket);
+            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+                console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
+            }
         }
         this.app.removeGroupMarkets(removeMarkets);
     }
