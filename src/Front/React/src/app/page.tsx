@@ -181,6 +181,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     };
 
     const getChartData = () => {
+        const now = Date.now();
         const chartData: ChartDataInterface = {
             allTimestamps: [],
             xMax: undefined,
@@ -202,9 +203,11 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     times: [],
                     color: getColor(odd)
                 };
+                let v: number = 0;
+                let t: number = 0;
                 for (const oddValue of odd.values) {
-                    const v = oddValue.v / 1000;
-                    const t = oddValue.t;
+                    v = oddValue.v / 1000;
+                    t = oddValue.t;
                     serie.values.push(v);
                     serie.times.push(t);
                     if (serie.yMax === undefined || v > serie.yMax) {
@@ -228,12 +231,24 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     }
                     timestampSet.add(t);
                 }
+                if (chartData.xMax === undefined || now > chartData.xMax) {
+                    chartData.xMax = now;
+                }
+                serie.values.push(v);
+                serie.times.push(now);
+
                 chartData.series.push(serie);
             }
         }
+        timestampSet.add(now);
         chartData.allTimestamps = Array.from(timestampSet);
         chartData.allTimestamps.sort((a, b) => a - b);
         chartData.series = alignSeries(chartData.series, chartData.allTimestamps);
+        chartData.series.sort((a, b) => {
+            const aLastValue = a.values[a.values.length - 1];
+            const bLastValue = b.values[b.values.length - 1];
+            return bLastValue - aLastValue;
+        })
         return chartData;
     };
 
