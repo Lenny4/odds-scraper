@@ -7,6 +7,7 @@
       <env name="ORBITX_PASSWORD" value="loe083i524b" />
       <env name="ORBITX_USERNAME" value="lenny4" />
       <env name="SHOW_LOG_ADD_REMOVE_EVENT" value="1" />
+      <env name="TZ" value="UTC" />
     </envs>
     <method v="2" />
   </configuration>
