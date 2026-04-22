@@ -125,7 +125,7 @@ export default class ScrapSocketTask {
                 return r;
             });
         }
-        this.orbitxManager.removeModificationsOnMarkets(this.orbitxManager.markets);
+        this.orbitxManager.removeModificationsOnMarkets();
         for (const market of this.orbitxManager.markets) {
             const socketMarket = this.getBestSocketMarket(market);
             if (socketMarket) {
@@ -483,7 +483,7 @@ export default class ScrapSocketTask {
                 for (const bdat: BdatInterface of rc[type.prop]) {
                     const valueOddValue = Math.round(bdat.odds * 1000);
                     const oddLabel = this.orbitxManager.getOddLabel(runner, type.value, bdat.index, this.orbitxManager.name);
-                    if (valueOddValue > 1) {
+                    if (valueOddValue >= 1) {
                         const oddRunnerOddValue = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.orbitxManager.name, type.value, bdat.index);
                         this.orbitxManager.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }

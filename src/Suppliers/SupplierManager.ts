@@ -50,7 +50,7 @@ export abstract class SupplierManager {
         }
     }
 
-    removeModificationsOnMarkets(markets: MarketInterface[]): void {
+    removeModificationsOnMarkets(): void {
         const now = Date.now();
         for (const market of this.markets) {
             market.modificationsOnMarket = market.modificationsOnMarket?.filter(n => n > now - App.checkMarketModificationOnLast) ?? [];

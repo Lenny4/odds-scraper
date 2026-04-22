@@ -228,33 +228,30 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             }
         });
         socketMarket.websocket!.on('message', (data: Buffer) => {
-            let result: any = data.toString();
-            socketMarket.lastReceivedMessage = Date.now();
+            const raw = data.toString();
+            let result: any;
+
             try {
-                result = JSON.parse(result);
-                if (
-                    !this.ignoreMessage(result) &&
-                    !this.handleMessageInitialDump(result)
-                ) {
-                    console.warn("new message 1", result);
-                    DiscordService.send(JSON.stringify({
-                        event: "no handle",
-                        message: data,
-                    }));
-                }
-                this.removeModificationsOnMarkets(this.markets);
-                return;
-            } catch (e) {
-                // nothing
+                result = JSON.parse(raw);
+            } catch {
+                result = raw;
             }
-            if (result === "PONG") {
+
+            if (typeof result === "string") {
+                if (result === "PONG") return;
+
+                console.warn("new message (unhandled string)", result);
+                DiscordService.send(JSON.stringify({ event: "no handle string", message: result }));
                 return;
             }
-            console.warn("new message 2", result)
-            DiscordService.send(JSON.stringify({
-                event: "no handle",
-                message: data,
-            }));
+
+            if (
+                !this.ignoreMessage(result) &&
+                !this.handleMessageInitialDump(result, socketMarket)
+            ) {
+                console.warn("new message (unhandled object)", result);
+                DiscordService.send(JSON.stringify({ event: "no handle object", message: result }));
+            }
         });
     }
 
@@ -266,7 +263,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         );
     }
 
-    private handleMessageInitialDump(initialDumps: PolymarketInitialDumpInterface[] | PolymarketInitialDumpInterface): boolean {
+    private handleMessageInitialDump(initialDumps: PolymarketInitialDumpInterface[] | PolymarketInitialDumpInterface, socketMarket: SocketMarketInterface): boolean {
         const now = Date.now();
         if (!Array.isArray(initialDumps)) {
             initialDumps = [initialDumps];
@@ -282,6 +279,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         ) {
             return false;
         }
+        socketMarket.lastReceivedMessage = Date.now();
         const markets: MarketInterface[] = [];
         for (const initialDump of initialDumps) {
             const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
@@ -297,7 +295,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
 
                     const valueOddValue = Math.round((1 / Number(prop.price)) * 1000);
                     const oddLabel = this.getOddLabel(runner, type.value, index, this.name);
-                    if (valueOddValue > 1) {
+                    if (valueOddValue >= 1) {
                         const oddRunnerOddValue = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.name, type.value, index);
                         this.addOddValue(oddRunnerOddValue, valueOddValue, now)
                     }
@@ -311,6 +309,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             }
         }
         this.app.liveSocketService.sendOddsMessage(markets);
+        this.removeModificationsOnMarkets();
         return true;
     }
 
