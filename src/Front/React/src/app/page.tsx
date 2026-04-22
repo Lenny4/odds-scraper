@@ -14,7 +14,7 @@ import {MarketRunnerInterface, OddInterface} from "../../../../Interface/MarketI
 import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
 import {ChartDataInterface, SerieColorInterface, SerieInterface} from "@/interface/ChartInterface";
-import {OddNameEnum} from "../../../../Enum/MarketEnum";
+import {OddNameEnum, OddTypeEnum} from "../../../../Enum/MarketEnum";
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import {CustomTabPanel} from "@/app/component/CustomTabPanel";
@@ -126,15 +126,57 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         });
     }
 
+    const SUPPLIER_HUE_SHIFT: Record<string, number> = {
+        "OrbitxManager": 0,
+        "PolymarketManager": 20,
+    };
+
+    const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const l = (max + min) / 2;
+        if (max === min) return [0, 0, l];
+        const d = max - min;
+        const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        const h = max === r ? (g - b) / d + (g < b ? 6 : 0)
+            : max === g ? (b - r) / d + 2
+                : (r - g) / d + 4;
+        return [h * 60, s, l];
+    };
+
+    const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+        const hue2rgb = (p: number, q: number, t: number) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        return [
+            Math.round(hue2rgb(p, q, (h / 360) + 1/3) * 255),
+            Math.round(hue2rgb(p, q,  h / 360)        * 255),
+            Math.round(hue2rgb(p, q, (h / 360) - 1/3) * 255),
+        ];
+    };
+
+    const shiftHue = (color: SerieColorInterface, degrees: number): SerieColorInterface => {
+        const [h, s, l] = rgbToHsl(color.r, color.g, color.b);
+        const [r, g, b] = hslToRgb((h + degrees) % 360, s, l);
+        return { r, g, b, a: color.a };
+    };
+
     const getColor = (odd: OddInterface): SerieColorInterface => {
-        if (odd.supplier === "OrbitxManager") {
-            return {r: 166, g: 216, b: 255, a: 1}
-        }
-        if (odd.supplier === "PolymarketManager") {
-            return {r: 250, g: 201, b: 209, a: 1}
-        }
-        return {r: 0, g: 0, b: 0, a: 0.5}
-    }
+        const baseColor: SerieColorInterface =
+            odd.type === OddTypeEnum.Back ? { r: 166, g: 216, b: 255, a: 1 } :
+                odd.type === OddTypeEnum.Lay  ? { r: 250, g: 201, b: 209, a: 1 } :
+                    { r: 0,   g: 0,   b: 0,   a: 0.5 };
+
+        const hueShift = SUPPLIER_HUE_SHIFT[odd.supplier] ?? 0;
+        return hueShift === 0 ? baseColor : shiftHue(baseColor, hueShift);
+    };
 
     const getChartData = () => {
         const chartData: ChartDataInterface = {
