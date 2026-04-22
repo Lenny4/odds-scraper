@@ -41,7 +41,6 @@ export default class Dashboard {
     private async getDetails() {
         const now = Date.now();
 
-        const supplierManagers = Object.values(this.app).filter(supplierManager => supplierManager instanceof SupplierManager);
         const details: DetailAppInterface = {
             groupMarkets: this.app.groupMarkets.map(gm => {
                 const groupMarketMessage: GroupMarketMessageInterface = {
@@ -77,7 +76,7 @@ export default class Dashboard {
                 };
                 return groupMarketMessage;
             }),
-            socketMarkets: supplierManagers.map((supplierManager) => {
+            socketMarkets: this.app.supplierManagers.map((supplierManager) => {
                 return {
                     name: supplierManager.name,
                     socketMarkets: supplierManager.socketMarkets.map(socketMarket => {

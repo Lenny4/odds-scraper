@@ -11,6 +11,7 @@ export default class MongoService {
     public connected: boolean = false;
     public marketCollectionName = 'groupMarkets';
     public sofascoreCollectionName = 'sofascore';
+    public bitcoinCollectionName = 'bitcoin';
 
     constructor(app: App) {
         this.app = app;
@@ -83,6 +84,7 @@ export default class MongoService {
             // Unless you create a collection you can not see your database in mongodb
             await this.orbitxDb.createCollection(this.marketCollectionName)
             await this.orbitxDb.createCollection(this.sofascoreCollectionName)
+            await this.orbitxDb.createCollection(this.bitcoinCollectionName)
         }
         this.connected = true;
         console.log("Connected to MongoDb !");

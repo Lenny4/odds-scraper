@@ -18,8 +18,7 @@ import {SupplierInterface} from "./Interface/SupplierInterface";
 
 export default class App {
     static readonly checkMarketModificationOnLast: number = 5 * 60_000;
-    orbitxManager: OrbitxManager;
-    polymarketManager: PolymarketManager;
+    supplierManagers: SupplierInterface[] = [];
     mongoService: MongoService;
     liveSocketService: LiveSocketService;
     dashboard: Dashboard;
@@ -44,16 +43,19 @@ export default class App {
 
     constructor() {
         this.mongoService = new MongoService(this);
-        this.orbitxManager = new OrbitxManager(this);
-        this.polymarketManager = new PolymarketManager(this);
+        this.supplierManagers = [
+            new OrbitxManager(this),
+            new PolymarketManager(this),
+        ]
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
     }
 
     async start() {
-        await this.mongoService.start()
-        this.orbitxManager.start();
-        this.polymarketManager.start();
+        await this.mongoService.start();
+        for (const manager of this.supplierManagers) {
+            manager.start();
+        }
         this.dashboard.start()
         this.liveSocketService.start()
     }
@@ -70,8 +72,8 @@ export default class App {
     }
 
     addGroupMarket(market: MarketInterface): GroupMarketInterface {
-        for (const supplierManager of Object.values(this)) {
-            if (!(supplierManager instanceof SupplierManager) || market.supplier === supplierManager.name) {
+        for (const supplierManager of this.supplierManagers) {
+            if (market.supplier === supplierManager.name) {
                 continue;
             }
             const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
@@ -137,10 +139,7 @@ export default class App {
             // Copier la liste pour éviter mutation pendant itération
             const marketsToRemove = [...groupMarket.markets];
             for (const market of marketsToRemove) {
-                const supplierManager = Object.values(this).find(
-                    sm => sm instanceof SupplierManager && sm.name === market.supplier
-                ) as SupplierInterface;
-                // Suppression côté supplier
+                const supplierManager = this.supplierManagers.find(sm => sm.name === market.supplier)!;
                 supplierManager.markets = supplierManager.markets.filter(m => m.id !== market.id);
             }
             // Suppression côté group en une seule fois

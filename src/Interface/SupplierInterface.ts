@@ -11,7 +11,7 @@ export interface SupplierInterface {
     running: boolean;
     socketMarkets: SocketMarketInterface[];
 
-    start(distance: number): Promise<void>;
+    start(): Promise<void>;
 
     stop(): Promise<void>;
 
