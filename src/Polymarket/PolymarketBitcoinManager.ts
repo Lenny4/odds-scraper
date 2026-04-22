@@ -1,0 +1,161 @@
+'use strict';
+
+
+import App from "../App";
+import {
+    PolymarketEventInterface,
+    PolymarketSerieEventInterface,
+    PolymarketSeriesInterface
+} from "../Interface/PolymarketInterface";
+import PolymarketManager from "../Suppliers/Polymarket/PolymarketManager";
+import {
+    MarketInterface,
+    RunnerInterface,
+    SocketMarketInterface,
+    TimeValueInterface
+} from "../Interface/MarketInterface";
+import {SportEnum} from "../Enum/SportEnum";
+
+export default class PolymarketBitcoinManager extends PolymarketManager {
+    static readonly url = 'https://gamma-api.polymarket.com';
+    name: string = "PolymarketBitcoinManager";
+    app!: App;
+    socketMarketId: number = 0;
+    markets: MarketInterface[] = [];
+    socketMarkets: SocketMarketInterface[] = [];
+    private serieId: number = 10684;
+    private wsBinance: WebSocket | null = null;
+    private bitcoinPrice: TimeValueInterface[] = [];
+
+    constructor(app: App) {
+        super(app)
+    }
+
+    async start() {
+        const serie = await this._getSerie();
+        for (const serieEvent of serie.events) {
+            const event = await this._getEvent(serieEvent);
+            this.markets = [
+                this.transformApiMarketToMarket({polymarketMarket: event.markets[0], serie: serie, event: event})
+            ];
+            this.clearBitcoinPrice();
+            this.createSocketMarket();
+            await this.watchMarkets();
+        }
+        this.start();
+    }
+
+    createWsBinance() {
+        this.wsBinance = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+        this.wsBinance.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const currentPrice = parseFloat(data.p);
+            if (this.bitcoinPrice.length === 0 || this.bitcoinPrice[this.bitcoinPrice.length - 1].v !== currentPrice) {
+                this.bitcoinPrice.push({
+                    i: 0,
+                    v: currentPrice,
+                    t: Date.now(),
+                })
+            }
+        }
+        this.wsBinance.onclose = (e) => {
+            console.error("this.wsBinance", e)
+            this.createWsBinance();
+        }
+    }
+
+    transformApiMarketToMarket({
+                                   polymarketMarket,
+                                   serie,
+                                   event,
+                               }: {
+        polymarketMarket: any,
+        serie: PolymarketSeriesInterface,
+        event: PolymarketEventInterface
+    }): MarketInterface {
+        const now = Date.now();
+        const market: MarketInterface = {
+            event: {
+                id: event.id,
+                name: event.title,
+                competition: {
+                    id: serie.id,
+                    name: serie.id.toString(),
+                    enum: null,
+                    sport: {
+                        id: "",
+                        name: "",
+                        enum: SportEnum.Bitcoin,
+                    }
+                }
+            },
+            supplier: this.name,
+            id: polymarketMarket.id,
+            inPlay: null,
+            odds: [],
+            marketRunners: [],
+            name: polymarketMarket.sportsMarketType,
+            numberOfWinners: 1,
+            runners: JSON.parse(polymarketMarket.outcomes ?? "[]").map((name: string, index: number) => {
+                const runner: RunnerInterface = {
+                    id: JSON.parse(polymarketMarket.clobTokenIds ?? "[]")[index],
+                    name: name,
+                }
+                return runner;
+            }),
+            created: now,
+            startTime: event.startDate,
+            endTime: event.endDate,
+            status: null,
+            deleted: null,
+            totalMatched: 0,
+            diffs: [],
+            modificationsOnMarket: [],
+            connections: [],
+            isSaving: false,
+            clobTokenIds: JSON.parse(polymarketMarket.clobTokenIds ?? "[]"),
+        };
+        this.initMarket(market, this.name);
+        return market;
+    }
+
+    async stop() {
+        // todo
+    }
+
+    private clearBitcoinPrice() {
+        const startTime = this.markets[0].startTime;
+        this.bitcoinPrice = this.bitcoinPrice.filter(bp => bp.t >= startTime);
+    }
+
+    private async _getEvent(serieEvent: PolymarketSerieEventInterface) {
+        const endDate = new Date(serieEvent.endDate!).getTime();
+        const event = await this.getEvent(serieEvent.id);
+        event.startDate = endDate - (5 * 60 * 1000);
+        event.endDate = endDate;
+        return event;
+    }
+
+    private async watchMarkets() {
+        return new Promise<void>(resolve => {
+            console.log(this.markets[0].event.name)
+            setTimeout(() => {
+                this.closeSocketMarket(this.socketMarkets[0]);
+                resolve();
+            }, this.markets[0].endTime! - Date.now());
+        });
+    }
+
+    private async _getSerie() {
+        const now = Date.now();
+        const serie = await this.getSerie(this.serieId);
+        serie.events = serie.events.filter(e => {
+            const endDate = new Date(e.endDate).getTime();
+            return endDate > now;
+        })
+        serie.events.sort((a, b) => {
+            return new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+        })
+        return serie;
+    }
+}

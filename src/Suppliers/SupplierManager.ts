@@ -23,17 +23,6 @@ export abstract class SupplierManager {
         this.app = app;
     }
 
-    protected _addMarket(market: MarketInterface): void {
-        if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-            console.info("Add new market " + this.marketToString(market));
-        }
-        this.markets.push(market);
-        const groupMarket = this.addGroupMarket(market);
-        this.app.liveSocketService.sendGroupMarketsMessage({
-            groupMarketIds: [groupMarket.id],
-        })
-    }
-
     updateMarket(market: MarketInterface, newMarket: MarketInterface): void {
         const excludeKeys = ['odds', 'marketRunners', 'diffs', 'modificationsOnMarket', 'connections'];
 
@@ -58,7 +47,6 @@ export abstract class SupplierManager {
             market.modificationsOnMarket = market.modificationsOnMarket?.filter(n => n > now - App.checkMarketModificationOnLast) ?? [];
         }
     }
-
 
     initMarket(market: MarketInterface, supplier: string) {
         market.marketRunners = market.runners.map(r => {
@@ -86,30 +74,6 @@ export abstract class SupplierManager {
             return false;
         }
         return market.inPlay ?? false;
-    }
-
-    protected async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
-        const idSet = new Set(marketIdsToRemove);
-        const marketsToRemove = this.markets.filter(m => idSet.has(m.id) && !m.isSaving);
-        if (marketsToRemove.length === 0) {
-            return;
-        }
-        for (const market of marketsToRemove) {
-            // Set `isSaving` to `true` before any asynchronous operations to ensure
-            // that other processes calling this function will recognize these markets
-            // as already being processed, avoiding concurrent modifications.
-            market.isSaving = true;
-        }
-        const groupMarkets: GroupMarketInterface[] = [];
-        for (const removeMarket of marketsToRemove) {
-            const groupMarket = this.getGroupMarket(removeMarket.id, removeMarket.supplier);
-            groupMarkets.push(groupMarket);
-            await this.app.mongoService!.saveGroupMarket(groupMarket, time);
-            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-                console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
-            }
-        }
-        this.removeGroupMarkets(groupMarkets);
     }
 
     getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {
@@ -147,30 +111,8 @@ export abstract class SupplierManager {
         this._addMarket(market);
     }
 
-    protected _canScrapMarket(market: MarketInterface): boolean {
-        const now = Date.now();
-        const liveCompetitions = (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum));
-        return (
-            !this.getMarketIsFinish(market) &&
-            (
-                (
-                    ["match odds", "moneyline"].includes(market.name.toString().toLowerCase()) &&
-                    (market.startTime - (2 * 3600 * 1000) < now || liveCompetitions)
-                ) ||
-                (market.totalMatched > 20_000 || liveCompetitions) // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
-            ) &&
-            market.numberOfWinners === 1 &&
-            (now + (15 * 60 * 1000) < market.startTime || liveCompetitions) &&
-            [2, 3].includes(market.runners.length)
-        );
-    }
-
     async removeMarkets(ids: (string | number)[], time: number): Promise<void> {
         await this._removeMarkets(ids, time);
-    }
-
-    getGroupMarket(marketId: number | string, supplier: string) {
-        return this.app.groupMarkets.find(gm => gm.markets.find(m => m.id === marketId && m.supplier === supplier))!;
     }
 
     getCompetitionEnum(market: MarketInterface, supplier: string) {
@@ -188,7 +130,7 @@ export abstract class SupplierManager {
             const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
             const matchingMarket = this.findMatchingMarket(market, markets);
             if (matchingMarket) {
-                const groupMarket = this.getGroupMarket(matchingMarket.id, matchingMarket.supplier);
+                const groupMarket = this.app.getGroupMarket(matchingMarket.id, matchingMarket.supplier);
                 if (groupMarket) {
                     this.groupMarketAddMarket(groupMarket, market);
                     return groupMarket;
@@ -260,6 +202,59 @@ export abstract class SupplierManager {
                 this.app.groupMarkets = this.app.groupMarkets.filter(gm => gm.id !== groupMarket.id);
             }
         }
+    }
+
+    protected _addMarket(market: MarketInterface): void {
+        if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+            console.info("Add new market " + this.marketToString(market));
+        }
+        this.markets.push(market);
+        const groupMarket = this.addGroupMarket(market);
+        this.app.liveSocketService.sendGroupMarketsMessage({
+            groupMarketIds: [groupMarket.id],
+        })
+    }
+
+    protected async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
+        const idSet = new Set(marketIdsToRemove);
+        const marketsToRemove = this.markets.filter(m => idSet.has(m.id) && !m.isSaving);
+        if (marketsToRemove.length === 0) {
+            return;
+        }
+        for (const market of marketsToRemove) {
+            // Set `isSaving` to `true` before any asynchronous operations to ensure
+            // that other processes calling this function will recognize these markets
+            // as already being processed, avoiding concurrent modifications.
+            market.isSaving = true;
+        }
+        const groupMarkets: GroupMarketInterface[] = [];
+        for (const removeMarket of marketsToRemove) {
+            const groupMarket = this.app.getGroupMarket(removeMarket.id, removeMarket.supplier);
+            groupMarkets.push(groupMarket);
+            await this.app.mongoService!.saveGroupMarket(groupMarket, time);
+            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+                console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
+            }
+        }
+        this.removeGroupMarkets(groupMarkets);
+    }
+
+    protected _canScrapMarket(market: MarketInterface): boolean {
+        const now = Date.now();
+        const liveCompetitions = (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum));
+        return (
+            !this.getMarketIsFinish(market) &&
+            (
+                (
+                    ["match odds", "moneyline"].includes(market.name.toString().toLowerCase()) &&
+                    (market.startTime - (2 * 3600 * 1000) < now || liveCompetitions)
+                ) ||
+                (market.totalMatched > 20_000 || liveCompetitions) // totalMatched is not in EUR but rather in a currency 4.5 times higher than EUR
+            ) &&
+            market.numberOfWinners === 1 &&
+            (now + (15 * 60 * 1000) < market.startTime || liveCompetitions) &&
+            [2, 3].includes(market.runners.length)
+        );
     }
 
     private compareRunnerNames(a: string, b: string): number {

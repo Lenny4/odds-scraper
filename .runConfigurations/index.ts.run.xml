@@ -1,14 +1,15 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="index.ts" type="NodeJSConfigurationType" nameIsGenerated="true" path-to-js-file="index.ts" typescript-loader="bundled" working-dir="$PROJECT_DIR$/src">
-    <envs>
-      <env name="DISCORD_WEBHOOK" value="https://discord.com/api/webhooks/1225647779292909608/EbUCfqzU1lHfJfkGRnn9c0NdPd2VsVpOUbwkjS1J3885TOYI6QF1jVRnXbOZF23eeEo9" />
-      <env name="HEADLESS" value="true" />
-      <env name="NODE_API_PORT" value="4000" />
-      <env name="ORBITX_PASSWORD" value="loe083i524b" />
-      <env name="ORBITX_USERNAME" value="lenny4" />
-      <env name="SHOW_LOG_ADD_REMOVE_EVENT" value="1" />
-      <env name="TZ" value="UTC" />
-    </envs>
-    <method v="2" />
-  </configuration>
+    <configuration default="false" name="index.ts" type="NodeJSConfigurationType" nameIsGenerated="true"
+                   path-to-js-file="index.ts" typescript-loader="bundled" working-dir="$PROJECT_DIR$/src">
+        <envs>
+            <env name="DISCORD_WEBHOOK"
+                 value="https://discord.com/api/webhooks/1225647779292909608/EbUCfqzU1lHfJfkGRnn9c0NdPd2VsVpOUbwkjS1J3885TOYI6QF1jVRnXbOZF23eeEo9"/>
+            <env name="HEADLESS" value="true"/>
+            <env name="NODE_API_PORT" value="4000"/>
+            <env name="ORBITX_PASSWORD" value="loe083i524b"/>
+            <env name="ORBITX_USERNAME" value="lenny4"/>
+            <env name="SHOW_LOG_ADD_REMOVE_EVENT" value="1"/>
+        </envs>
+        <method v="2"/>
+    </configuration>
 </component>

@@ -56,6 +56,7 @@ export interface MarketInterface extends MarketMessageInterface {
     inPlay: boolean | null;
     status: MarketStatusEnum | null;
     startTime: number;
+    endTime?: number | null;
     totalMatched: number;
     numberOfWinners: number;
     diffs: DiffMarketInterface[];

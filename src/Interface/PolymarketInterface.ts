@@ -6,13 +6,17 @@ export interface PolymarketSportInterface {
     series: string;
 }
 
+export interface PolymarketSerieEventInterface {
+    id: string;
+    title: string;
+    active: boolean;
+    closed: boolean;
+    endDate: string;
+}
+
 export interface PolymarketSeriesInterface {
     id: string;
-    events: {
-        id: string;
-        active: boolean;
-        closed: boolean;
-    }[];
+    events: PolymarketSerieEventInterface[];
 }
 
 interface PolymarketInitialDumpOddInterface {
@@ -34,5 +38,7 @@ export interface PolymarketInitialDumpInterface {
 export interface PolymarketEventInterface {
     id: string;
     title: string;
+    startDate: number;
+    endDate: number | null;
     markets: any[];
 }

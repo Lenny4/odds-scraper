@@ -66,7 +66,7 @@ export default class LiveSocketService {
                 );
                 for (const odd of odds) {
                     oddRequests.push({
-                        groupMarketId: groupMarket.id,
+                        groupMarketId: groupMarket?.id, // groupMarket peut être undefined pour PolymarketBitcoinManager par exemple
                         i: odd.nbValues,
                         index: odd.index,
                         marketId: market.id,

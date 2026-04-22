@@ -8,11 +8,13 @@ import {CompetitionEnum} from "./Enum/CompetitionEnum";
 import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
 import LiveSocketService from "./Service/LiveSocketService";
 import {SupplierInterface} from "./Interface/SupplierInterface";
+import PolymarketBitcoinManager from "./Polymarket/PolymarketBitcoinManager";
 
 export default class App {
     static readonly checkMarketModificationOnLast: number = 5 * 60_000;
     supplierManagers: SupplierInterface[] = [];
     mongoService: MongoService;
+    polymarketBitcoinManager: PolymarketBitcoinManager;
     liveSocketService: LiveSocketService;
     dashboard: Dashboard;
     groupMarketId: number = 0;
@@ -40,17 +42,23 @@ export default class App {
             new OrbitxManager(this),
             new PolymarketManager(this),
         ]
+        this.polymarketBitcoinManager = new PolymarketBitcoinManager(this);
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
     }
 
+    getGroupMarket(marketId: number | string, supplier: string) {
+        return this.groupMarkets.find(gm => gm.markets.find(m => m.id === marketId && m.supplier === supplier))!;
+    }
+
     async start() {
         await this.mongoService.start();
-        for (const manager of this.supplierManagers) {
-            manager.start();
-        }
-        this.dashboard.start()
-        this.liveSocketService.start()
+        this.polymarketBitcoinManager.start()
+        // for (const manager of this.supplierManagers) {
+        //     manager.start();
+        // }
+        // this.dashboard.start()
+        // this.liveSocketService.start()
     }
 
     async stop() {

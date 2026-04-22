@@ -145,38 +145,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         return null;
     }
 
-    private closeSocketMarket(socketMarket: SocketMarketInterface) {
-        socketMarket.closing = true;
-        if (
-            socketMarket?.websocket &&
-            (socketMarket.websocket.readyState === WebSocket.CONNECTING || socketMarket.websocket.readyState === WebSocket.OPEN)
-        ) {
-            socketMarket.websocket.close();
-        }
-        this.socketMarkets = this.socketMarkets.filter(sm => sm.id !== socketMarket.id);
-    }
-
-    private async connectMarkets() {
-        const now = Date.now();
-        if (this.markets.length === 0) {
-            for (const socketMarket of this.socketMarkets) {
-                this.closeSocketMarket(socketMarket);
-            }
-        } else if (this.socketMarkets.length === 0) {
-            this.createSocketMarket();
-        } else {
-            for (const socketMarket of this.socketMarkets) {
-                if (socketMarket.closing) {
-                    continue;
-                }
-                if (socketMarket.open !== null && socketMarket.open + this.maxOpenTime < now) {
-                    this.createSocketMarket(socketMarket.id);
-                }
-            }
-        }
-    }
-
-    private createSocketMarket(replaceSocketMarketId: number | undefined = undefined) {
+    protected createSocketMarket(replaceSocketMarketId: number | undefined = undefined) {
         this.socketMarketId++;
         const socketMarket: SocketMarketInterface = {
             id: this.socketMarketId,
@@ -241,7 +210,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 if (result === "PONG") return;
 
                 console.warn("new message (unhandled string)", result);
-                DiscordService.send(JSON.stringify({ event: "no handle string", message: result }));
+                DiscordService.send(JSON.stringify({event: "no handle string", message: result}));
                 return;
             }
 
@@ -250,70 +219,12 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 !this.handleMessageInitialDump(result, socketMarket)
             ) {
                 console.warn("new message (unhandled object)", result);
-                DiscordService.send(JSON.stringify({ event: "no handle object", message: result }));
+                DiscordService.send(JSON.stringify({event: "no handle object", message: result}));
             }
         });
     }
 
-    private ignoreMessage(data: any): boolean {
-        return data.hasOwnProperty("event_type") && (
-            data.event_type === "last_trade_price" ||
-            data.event_type === "tick_size_change" ||
-            data.event_type === "price_change"
-        );
-    }
-
-    private handleMessageInitialDump(initialDumps: PolymarketInitialDumpInterface[] | PolymarketInitialDumpInterface, socketMarket: SocketMarketInterface): boolean {
-        const now = Date.now();
-        if (!Array.isArray(initialDumps)) {
-            initialDumps = [initialDumps];
-        }
-        if (
-            !initialDumps[0].hasOwnProperty("asset_id") ||
-            !initialDumps[0].hasOwnProperty("timestamp") ||
-            !initialDumps[0].hasOwnProperty("bids") || // lay
-            !initialDumps[0].hasOwnProperty("asks") || // back
-            // !initialDumps[0].hasOwnProperty("tick_size") ||
-            !initialDumps[0].hasOwnProperty("event_type") ||
-            initialDumps[0].event_type !== "book"
-        ) {
-            return false;
-        }
-        socketMarket.lastReceivedMessage = Date.now();
-        const markets: MarketInterface[] = [];
-        for (const initialDump of initialDumps) {
-            const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
-            markets.push(market);
-            market.modificationsOnMarket.push(now);
-            const marketRunner = market.marketRunners.find(mr => mr.runnerId === initialDump.asset_id)!;
-            const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
-            for (const type of this.types) {
-                // @ts-ignore
-                for (let index = 0; (index < initialDump[type.prop + "s"].length && index < 1); index++) {
-                    // @ts-ignore
-                    const prop = initialDump[type.prop + "s"][initialDump[type.prop + "s"].length - index - 1];
-
-                    const valueOddValue = Math.round((1 / Number(prop.price)) * 1000);
-                    const oddLabel = this.getOddLabel(runner, type.value, index, this.name);
-                    if (valueOddValue >= 1) {
-                        const oddRunnerOddValue = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.name, type.value, index);
-                        this.addOddValue(oddRunnerOddValue, valueOddValue, now)
-                    }
-
-                    const valueOddVolume = Math.round(Number(prop.size));
-                    if (valueOddVolume > 0) {
-                        const oddRunnerOddVolume = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, this.name, type.value, index);
-                        this.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
-                    }
-                }
-            }
-        }
-        this.app.liveSocketService.sendOddsMessage(markets);
-        this.removeModificationsOnMarkets();
-        return true;
-    }
-
-    private async sendMarkets() {
+    protected async sendMarkets() {
         for (const socketMarket of this.socketMarkets) {
             if (socketMarket.closing || socketMarket.websocket?.readyState !== WebSocket.OPEN) {
                 continue;
@@ -350,6 +261,116 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         }
     }
 
+    protected async getEvent(eventId: string): Promise<PolymarketEventInterface> {
+        const res = await fetch(PolymarketManager.url + '/events/' + eventId, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        });
+        return await res.json();
+    }
+
+    protected async getSerie(serieId: string | number): Promise<PolymarketSeriesInterface> {
+        const res = await fetch(PolymarketManager.url + '/series/' + serieId, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        });
+        const serie: PolymarketSeriesInterface = await res.json();
+        serie.events = serie.events.filter(e => !e.closed && e.active);
+        return serie;
+
+    }
+
+    protected closeSocketMarket(socketMarket: SocketMarketInterface) {
+        socketMarket.closing = true;
+        if (
+            socketMarket?.websocket &&
+            (socketMarket.websocket.readyState === WebSocket.CONNECTING || socketMarket.websocket.readyState === WebSocket.OPEN)
+        ) {
+            socketMarket.websocket.close();
+        }
+        this.socketMarkets = this.socketMarkets.filter(sm => sm.id !== socketMarket.id);
+    }
+
+    private async connectMarkets() {
+        const now = Date.now();
+        if (this.markets.length === 0) {
+            for (const socketMarket of this.socketMarkets) {
+                this.closeSocketMarket(socketMarket);
+            }
+        } else if (this.socketMarkets.length === 0) {
+            this.createSocketMarket();
+        } else {
+            for (const socketMarket of this.socketMarkets) {
+                if (socketMarket.closing) {
+                    continue;
+                }
+                if (socketMarket.open !== null && socketMarket.open + this.maxOpenTime < now) {
+                    this.createSocketMarket(socketMarket.id);
+                }
+            }
+        }
+    }
+
+    private ignoreMessage(data: any): boolean {
+        return data.hasOwnProperty("event_type") && (
+            data.event_type === "last_trade_price" ||
+            data.event_type === "tick_size_change" ||
+            data.event_type === "price_change"
+        );
+    }
+
+    private handleMessageInitialDump(initialDumps: PolymarketInitialDumpInterface[] | PolymarketInitialDumpInterface, socketMarket: SocketMarketInterface): boolean {
+        const now = Date.now();
+        if (!Array.isArray(initialDumps)) {
+            initialDumps = [initialDumps];
+        }
+        if (
+            !initialDumps[0].hasOwnProperty("asset_id") ||
+            !initialDumps[0].hasOwnProperty("timestamp") ||
+            !initialDumps[0].hasOwnProperty("bids") || // lay
+            !initialDumps[0].hasOwnProperty("asks") || // back
+            // !initialDumps[0].hasOwnProperty("tick_size") ||
+            !initialDumps[0].hasOwnProperty("event_type") ||
+            initialDumps[0].event_type !== "book"
+        ) {
+            return false;
+        }
+        socketMarket.lastReceivedMessage = Date.now();
+        const markets: MarketInterface[] = [];
+        for (const initialDump of initialDumps) {
+            const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
+            if (!markets.find(m => m.id === market.id)) {
+                markets.push(market);
+                market.modificationsOnMarket.push(now);
+            }
+            const marketRunner = market.marketRunners.find(mr => mr.runnerId === initialDump.asset_id)!;
+            const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
+            for (const type of this.types) {
+                // @ts-ignore
+                for (let index = 0; (index < initialDump[type.prop + "s"].length && index < 1); index++) {
+                    // @ts-ignore
+                    const prop = initialDump[type.prop + "s"][initialDump[type.prop + "s"].length - index - 1];
+
+                    const valueOddValue = Math.round((1 / Number(prop.price)) * 1000);
+                    const oddLabel = this.getOddLabel(runner, type.value, index, this.name);
+                    if (valueOddValue >= 1) {
+                        const oddRunnerOddValue = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.name, type.value, index);
+                        this.addOddValue(oddRunnerOddValue, valueOddValue, now)
+                    }
+
+                    const valueOddVolume = Math.round(Number(prop.size));
+                    if (valueOddVolume > 0) {
+                        const oddRunnerOddVolume = this.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, this.name, type.value, index);
+                        this.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
+                    }
+                }
+            }
+        }
+        this.app.liveSocketService.sendOddsMessage(markets);
+        this.removeModificationsOnMarkets();
+        return true;
+    }
+
     private async getMarkets(sport: PolymarketSportInterface) {
         const serie = await this.getSerie(sport.series);
         const events = serie.events.filter(e => !e.closed && e.active);
@@ -364,22 +385,6 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 }
             }
         }
-    }
-
-    private async getEvent(eventId: string): Promise<PolymarketEventInterface> {
-        const res = await fetch(PolymarketManager.url + '/events/' + eventId, {
-            method: 'GET',
-            headers: {'Content-Type': 'application/json'},
-        });
-        return await res.json();
-    }
-
-    private async getSerie(serieId: string): Promise<PolymarketSeriesInterface> {
-        const res = await fetch(PolymarketManager.url + '/series/' + serieId, {
-            method: 'GET',
-            headers: {'Content-Type': 'application/json'},
-        });
-        return await res.json();
     }
 
     private async getSports() {
