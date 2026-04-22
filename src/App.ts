@@ -80,7 +80,7 @@ export default class App {
             if (matchingMarket) {
                 const groupMarket = this.getGroupMarket(matchingMarket.id, matchingMarket.supplier);
                 if (groupMarket) {
-                    groupMarket.markets.push(market);
+                    this.groupMarketAddMarket(groupMarket, market);
                     return groupMarket;
                 }
             }
@@ -88,10 +88,17 @@ export default class App {
         this.groupMarketId++;
         const groupMarket: GroupMarketInterface = {
             id: this.groupMarketId,
-            markets: [market],
+            startTime: market.startTime,
+            markets: [],
         }
         this.groupMarkets.push(groupMarket);
+        this.groupMarketAddMarket(groupMarket, market);
         return groupMarket;
+    }
+
+    groupMarketAddMarket(groupMarket: GroupMarketInterface, market: MarketInterface) {
+        groupMarket.markets.push(market);
+        groupMarket.startTime = groupMarket.markets.reduce((sum, m) => sum + m.startTime, 0) / groupMarket.markets.length;
     }
 
     findMatchingMarket(market: MarketInterface, markets: MarketInterface[]): MarketInterface | null {

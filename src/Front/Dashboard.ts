@@ -46,6 +46,7 @@ export default class Dashboard {
             groupMarkets: this.app.groupMarkets.map(gm => {
                 const groupMarketMessage: GroupMarketMessageInterface = {
                     id: gm.id,
+                    startTime: gm.startTime,
                     markets: gm.markets.map(m => {
                         const marketMessage: MarketMessageInterface = {
                             marketRunners: m.marketRunners.map(mr => {

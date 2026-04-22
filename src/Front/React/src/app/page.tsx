@@ -132,7 +132,9 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     };
 
     const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
-        r /= 255; g /= 255; b /= 255;
+        r /= 255;
+        g /= 255;
+        b /= 255;
         const max = Math.max(r, g, b), min = Math.min(r, g, b);
         const l = (max + min) / 2;
         if (max === min) return [0, 0, l];
@@ -148,31 +150,31 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         const hue2rgb = (p: number, q: number, t: number) => {
             if (t < 0) t += 1;
             if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
             return p;
         };
         const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
         const p = 2 * l - q;
         return [
-            Math.round(hue2rgb(p, q, (h / 360) + 1/3) * 255),
-            Math.round(hue2rgb(p, q,  h / 360)        * 255),
-            Math.round(hue2rgb(p, q, (h / 360) - 1/3) * 255),
+            Math.round(hue2rgb(p, q, (h / 360) + 1 / 3) * 255),
+            Math.round(hue2rgb(p, q, h / 360) * 255),
+            Math.round(hue2rgb(p, q, (h / 360) - 1 / 3) * 255),
         ];
     };
 
     const shiftHue = (color: SerieColorInterface, degrees: number): SerieColorInterface => {
         const [h, s, l] = rgbToHsl(color.r, color.g, color.b);
         const [r, g, b] = hslToRgb((h + degrees) % 360, s, l);
-        return { r, g, b, a: color.a };
+        return {r, g, b, a: color.a};
     };
 
     const getColor = (odd: OddInterface): SerieColorInterface => {
         const baseColor: SerieColorInterface =
-            odd.type === OddTypeEnum.Back ? { r: 166, g: 216, b: 255, a: 1 } :
-                odd.type === OddTypeEnum.Lay  ? { r: 250, g: 201, b: 209, a: 1 } :
-                    { r: 0,   g: 0,   b: 0,   a: 0.5 };
+            odd.type === OddTypeEnum.Back ? {r: 166, g: 216, b: 255, a: 1} :
+                odd.type === OddTypeEnum.Lay ? {r: 250, g: 201, b: 209, a: 1} :
+                    {r: 0, g: 0, b: 0, a: 0.5};
 
         const hueShift = SUPPLIER_HUE_SHIFT[odd.supplier] ?? 0;
         return hueShift === 0 ? baseColor : shiftHue(baseColor, hueShift);
@@ -378,8 +380,9 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                                 const runner = market.runners.find(r => r.id === marketRunner.runnerId)!;
                                 return (
                                     <FormControlLabel key={or.oddRequestIndex}
-                                                      control={<Checkbox checked={selectedOddRequests.includes(or.oddRequestIndex)}
-                                                                         onChange={handleChange(or.oddRequestIndex)}/>}
+                                                      control={<Checkbox
+                                                          checked={selectedOddRequests.includes(or.oddRequestIndex)}
+                                                          onChange={handleChange(or.oddRequestIndex)}/>}
                                                       label={JSON.stringify({
                                                           supplier: or.supplier,
                                                           type: or.type,
@@ -571,6 +574,9 @@ export default function Home() {
             </Box>
             <CustomTabPanel value={value} index={0}>
                 {detailApp.groupMarkets.sort((a, b) => {
+                    if (b.markets.length === a.markets.length) {
+                        return a.startTime - b.startTime;
+                    }
                     return b.markets.length - a.markets.length;
                 }).map(gm => {
                     const market = gm.markets[0];
@@ -583,7 +589,13 @@ export default function Home() {
                         >
                             <AccordionSummary expandIcon={<ExpandMoreIcon/>}>
                                 <Typography component="span">
-                                    {`${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)}`}
+                                    {`${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)} ${new Date(gm.startTime).toLocaleString("fr-FR", {
+                                        day: "2-digit",
+                                        month: "long",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                    })}`}
                                 </Typography>
                             </AccordionSummary>
                             <AccordionDetails>

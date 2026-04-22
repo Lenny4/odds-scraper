@@ -21,6 +21,7 @@ export interface MarketMessageInterface {
 
 export interface GroupMarketMessageInterface {
     id: number;
+    startTime: number;
     markets: MarketMessageInterface[];
 }
 

@@ -94,6 +94,7 @@ export default class LiveSocketService {
         return groupMarkets.map(gm => {
             const groupMarketMessage: GroupMarketMessageInterface = {
                 id: gm.id,
+                startTime: gm.startTime,
                 markets: gm.markets.map(m => {
                     const marketMessage: MarketMessageInterface = {
                         id: m.id,

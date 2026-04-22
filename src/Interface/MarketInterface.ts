@@ -106,6 +106,7 @@ export interface TimeValueInterface {
 
 export interface GroupMarketInterface {
     id: number;
+    startTime: number;
     markets: MarketInterface[];
 }
 
