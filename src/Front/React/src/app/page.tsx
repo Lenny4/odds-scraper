@@ -29,6 +29,11 @@ type JsonProps = {
 
 let applyZoomXaxis = true;
 
+interface GroupSupplierOddRequestInterface {
+    supplier: string;
+    oddRequests: (OddRequestInterface & { oddRequestIndex: number })[];
+}
+
 function linkifyJsonString(json: unknown): string {
     const jsonString = JSON.stringify(json, null, 2);
 
@@ -66,6 +71,24 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
     const [xaxis, setXaxis] = useState<ApexOptions['xaxis'] | undefined>(undefined)
     const [selectedOddRequests, setSelectedOddRequests] = useState<number[]>([])
+    const [groupSupplierOddRequests, setGroupSupplierOddRequests] = useState<GroupSupplierOddRequestInterface[]>(() => {
+        const result: GroupSupplierOddRequestInterface[] = [];
+        for (const [indexOddRequest, oddRequest] of oddRequests.entries()) {
+            let groupSupplierOddRequest = result.find(r => r.supplier === oddRequest.supplier);
+            if (!groupSupplierOddRequest) {
+                groupSupplierOddRequest = {
+                    supplier: oddRequest.supplier,
+                    oddRequests: [],
+                }
+                result.push(groupSupplierOddRequest)
+            }
+            groupSupplierOddRequest.oddRequests.push({
+                ...oddRequest,
+                oddRequestIndex: indexOddRequest
+            })
+        }
+        return result;
+    })
 
     const getSelectedOddRequests = () => {
         return oddRequests.filter((_, index) => selectedOddRequests.includes(index));
@@ -303,28 +326,32 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
 
     return (
         <>
-            <FormGroup>
-                {oddRequests.map((or, index) => {
-                    if (or.index === 0 && or.name === OddNameEnum.RunnerOddValue) {
-                        const market = groupMarketMessage.markets.find(m => m.id === or.marketId && m.supplier === or.supplier)!;
-                        const marketRunner: MarketRunnerInterface = getValueByPath(market, or.path.replace(".odds", ""));
-                        const runner = market.runners.find(r => r.id === marketRunner.runnerId)!;
-                        return (
-                            <FormControlLabel key={index}
-                                              control={<Checkbox checked={selectedOddRequests.includes(index)}
-                                                                 onChange={handleChange(index)}/>}
-                                              label={JSON.stringify({
-                                                  supplier: or.supplier,
-                                                  type: or.type,
-                                                  name: runner.name
-                                              })}/>
-                        )
-                    }
-                    return (
-                        <React.Fragment key={index}></React.Fragment>
-                    )
-                })}
-            </FormGroup>
+            <Box sx={{display: "flex"}}>
+                {groupSupplierOddRequests.map(groupSupplierOddRequest => (
+                    <FormGroup key={groupSupplierOddRequest.supplier}>
+                        {groupSupplierOddRequest.oddRequests.map((or) => {
+                            if (or.index === 0 && or.name === OddNameEnum.RunnerOddValue) {
+                                const market = groupMarketMessage.markets.find(m => m.id === or.marketId && m.supplier === or.supplier)!;
+                                const marketRunner: MarketRunnerInterface = getValueByPath(market, or.path.replace(".odds", ""));
+                                const runner = market.runners.find(r => r.id === marketRunner.runnerId)!;
+                                return (
+                                    <FormControlLabel key={or.oddRequestIndex}
+                                                      control={<Checkbox checked={selectedOddRequests.includes(or.oddRequestIndex)}
+                                                                         onChange={handleChange(or.oddRequestIndex)}/>}
+                                                      label={JSON.stringify({
+                                                          supplier: or.supplier,
+                                                          type: or.type,
+                                                          name: runner.name
+                                                      })}/>
+                                )
+                            }
+                            return (
+                                <React.Fragment key={or.oddRequestIndex}></React.Fragment>
+                            )
+                        })}
+                    </FormGroup>
+                ))}
+            </Box>
             {options && (<Chart options={options} series={options.series}/>)}
         </>
     );
