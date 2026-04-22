@@ -87,9 +87,8 @@ export abstract class SupplierManager {
     }
 
     async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
-        const marketsToRemove = this.markets.filter(m => {
-            return marketIdsToRemove.includes(m.id) && !m.isSaving;
-        });
+        const idSet = new Set(marketIdsToRemove);
+        const marketsToRemove = this.markets.filter(m => idSet.has(m.id) && !m.isSaving);
         if (marketsToRemove.length === 0) {
             return;
         }

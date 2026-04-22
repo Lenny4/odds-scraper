@@ -51,11 +51,21 @@ export default class Dashboard {
                             marketRunners: m.marketRunners.map(mr => {
                                 return {
                                     ...mr,
-                                    odds: [],
+                                    odds: mr.odds.map(o => {
+                                        return {
+                                            ...o,
+                                            values: [],
+                                        }
+                                    }),
                                 }
                             }),
                             name: m.name,
-                            odds: [],
+                            odds: m.odds.map(o => {
+                                return {
+                                    ...o,
+                                    values: [],
+                                }
+                            }),
                             runners: m.runners,
                             id: m.id,
                             supplier: m.supplier,

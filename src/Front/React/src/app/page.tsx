@@ -10,15 +10,18 @@ import {
     OddRequestInterface
 } from "../../../../Interface/LiveInterface";
 import {getOddsForOddRequest, getValueByPath} from "../../../../Service/Utils";
-import {OddInterface} from "../../../../Interface/MarketInterface";
+import {MarketRunnerInterface, OddInterface} from "../../../../Interface/MarketInterface";
 import Chart from "react-apexcharts";
 import {ApexOptions} from "apexcharts";
 import {ChartDataInterface, SerieColorInterface, SerieInterface} from "@/interface/ChartInterface";
-import {OddNameEnum, OddTypeEnum} from "../../../../Enum/MarketEnum";
+import {OddNameEnum} from "../../../../Enum/MarketEnum";
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import {CustomTabPanel} from "@/app/component/CustomTabPanel";
 import {getSocketDetails, getSocketGroupMarkets} from "@/app/sockets";
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 
 type JsonProps = {
     json: unknown;
@@ -62,6 +65,11 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
 }) {
     const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
     const [xaxis, setXaxis] = useState<ApexOptions['xaxis'] | undefined>(undefined)
+    const [selectedOddRequests, setSelectedOddRequests] = useState<number[]>([])
+
+    const getSelectedOddRequests = () => {
+        return oddRequests.filter((_, index) => selectedOddRequests.includes(index));
+    }
 
     const alignSeries = (series: SerieInterface[], allTimestamps: number[]) => {
         return series.map(serie => {
@@ -115,7 +123,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             yMin: undefined,
         };
         const timestampSet = new Set<number>();
-        for (const oddRequest of oddRequests) {
+        for (const oddRequest of getSelectedOddRequests()) {
             const market = groupMarketMessage.markets.find(m => m.id === oddRequest.marketId)!;
             const odds = getOddsForOddRequest(market, oddRequest);
             for (const odd of odds) {
@@ -128,7 +136,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     color: getColor(odd)
                 };
                 for (const oddValue of odd.values) {
-                    const v = Math.round(oddValue.v / 10) / 100;
+                    const v = oddValue.v / 1000;
                     const t = oddValue.t;
                     serie.values.push(v);
                     serie.times.push(t);
@@ -267,12 +275,56 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         setOptions(options);
     }
 
+    const sendOddRequests = () => {
+        if (selectedOddRequests.length > 0) {
+            getSocketGroupMarkets().emit("message", {
+                type: "odds",
+                value: getSelectedOddRequests(),
+            });
+        }
+    };
+
+    const handleChange = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) => {
+        setSelectedOddRequests(x => {
+            if (event.target.checked) {
+                return [...x, index];
+            }
+            return x.filter(i => i !== index);
+        });
+    };
+
     useEffect(() => {
         updateOption();
     }, [groupMarketMessage, xaxis]);
 
+    useEffect(() => {
+        sendOddRequests();
+    }, [selectedOddRequests]);
+
     return (
         <>
+            <FormGroup>
+                {oddRequests.map((or, index) => {
+                    if (or.index === 0 && or.name === OddNameEnum.RunnerOddValue) {
+                        const market = groupMarketMessage.markets.find(m => m.id === or.marketId && m.supplier === or.supplier)!;
+                        const marketRunner: MarketRunnerInterface = getValueByPath(market, or.path.replace(".odds", ""));
+                        const runner = market.runners.find(r => r.id === marketRunner.runnerId)!;
+                        return (
+                            <FormControlLabel key={index}
+                                              control={<Checkbox checked={selectedOddRequests.includes(index)}
+                                                                 onChange={handleChange(index)}/>}
+                                              label={JSON.stringify({
+                                                  supplier: or.supplier,
+                                                  type: or.type,
+                                                  name: runner.name
+                                              })}/>
+                        )
+                    }
+                    return (
+                        <React.Fragment key={index}></React.Fragment>
+                    )
+                })}
+            </FormGroup>
             {options && (<Chart options={options} series={options.series}/>)}
         </>
     );
@@ -284,23 +336,16 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
     const getOddRequests = () => {
         const oddRequests: OddRequestInterface[] = [];
         for (const market of groupMarketMessage.markets) {
-            const defaultOddRequest: OddRequestInterface = {
-                groupMarketId: groupMarketMessage.id,
-                marketId: market.id,
-                name: OddNameEnum.RunnerOddValue,
-                type: OddTypeEnum.Back,
-                path: "",
-                supplier: market.supplier,
-                index: 0,
-            };
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
-                if (
-                    indexMarketRunner === 1 &&
-                    marketRunner.odds.length === 0
-                ) {
+                for (const odd of marketRunner.odds) {
                     oddRequests.push({
-                        ...defaultOddRequest,
+                        groupMarketId: groupMarketMessage.id,
+                        marketId: market.id,
+                        name: odd.name,
+                        type: odd.type,
                         path: `marketRunners[${indexMarketRunner}].odds`,
+                        supplier: market.supplier,
+                        index: odd.index,
                     });
                 }
             }
@@ -308,15 +353,6 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
         return oddRequests;
     };
     const [oddRequests, setOddRequests] = useState<OddRequestInterface[]>(getOddRequests())
-
-    const sendOddRequests = () => {
-        if (oddRequests.length > 0) {
-            getSocketGroupMarkets().emit("message", {
-                type: "odds",
-                value: oddRequests,
-            });
-        }
-    };
 
     const handleOddReceive = (oddReceives: OddReceiveInterface[]) => {
         const oddRequests: OddRequestInterface[] = [];
@@ -388,7 +424,6 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
     };
 
     useEffect(() => {
-        sendOddRequests();
         const socketGroupMarkets = getSocketGroupMarkets();
         socketGroupMarkets.on("message", handleMessage);
         return () => {
