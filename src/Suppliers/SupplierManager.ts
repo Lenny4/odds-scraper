@@ -48,6 +48,9 @@ export abstract class SupplierManager {
         }
     }
 
+    private isEqualArray = (a: any[], b: any[]) =>
+        a.length === b.length && a.every((val, i) => val === b[i]);
+
     addConnectionToMarkets(
         markets: MarketInterface[],
         type: 'open' | 'close',
@@ -57,10 +60,14 @@ export abstract class SupplierManager {
     ) {
         const now = Date.now();
         for (const market of markets) {
-            if (
-                market.connections.length === 0 ||
-                market.connections[market.connections.length - 1].type !== type
-            ) {
+            let add = true;
+            for (let i = market.connections.length - 1; i >= 0; i--) {
+                if (this.isEqualArray(market.connections[i].odds, odds)) {
+                    add = market.connections[i].type !== type
+                    break;
+                }
+            }
+            if (add) {
                 market.connections.push({
                     time: now - minusTime,
                     odds: odds,
