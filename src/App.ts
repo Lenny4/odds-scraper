@@ -14,7 +14,6 @@ export default class App {
     static readonly checkMarketModificationOnLast: number = 5 * 60_000;
     supplierManagers: SupplierInterface[] = [];
     mongoService: MongoService;
-    polymarketBitcoinManager: PolymarketBitcoinManager;
     liveSocketService: LiveSocketService;
     dashboard: Dashboard;
     groupMarketId: number = 0;
@@ -43,7 +42,6 @@ export default class App {
             new PolymarketManager(this),
             new PolymarketBitcoinManager(this),
         ]
-        this.polymarketBitcoinManager = new PolymarketBitcoinManager(this);
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
     }
@@ -54,10 +52,11 @@ export default class App {
 
     async start() {
         await this.mongoService.start();
-        this.polymarketBitcoinManager.start()
-        // for (const manager of this.supplierManagers) {
-        //     manager.start();
-        // }
+        for (const manager of this.supplierManagers) {
+            // if (manager.name === PolymarketBitcoinManager.name) {
+            manager.start();
+            // }
+        }
         this.dashboard.start()
         this.liveSocketService.start()
     }
