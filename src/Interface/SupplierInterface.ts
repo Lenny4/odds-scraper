@@ -29,7 +29,7 @@ export interface SupplierInterface {
 
     getStatus(status: string): MarketStatusEnum | null;
 
-    removeMarkets(ids: (string | number)[], time: number): Promise<void>;
+    removeMarkets(ids: (string | number)[], time: number, save: boolean | undefined): Promise<void>;
 
     getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined, index: number | undefined): OddInterface;
 

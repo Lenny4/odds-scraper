@@ -136,8 +136,8 @@ export abstract class SupplierManager {
         this._addMarket(market);
     }
 
-    async removeMarkets(ids: (string | number)[], time: number): Promise<void> {
-        await this._removeMarkets(ids, time);
+    async removeMarkets(ids: (string | number)[], time: number, save: boolean | undefined = undefined): Promise<void> {
+        await this._removeMarkets(ids, time, save);
     }
 
     getCompetitionEnum(market: MarketInterface, supplier: string) {
@@ -195,7 +195,7 @@ export abstract class SupplierManager {
         })
     }
 
-    protected async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
+    protected async _removeMarkets(marketIdsToRemove: (string | number)[], time: number, save: boolean | undefined = undefined) {
         if (marketIdsToRemove.length === 0) {
             return;
         }
@@ -214,9 +214,13 @@ export abstract class SupplierManager {
         for (const removeMarket of marketsToRemove) {
             const groupMarket = this.app.getGroupMarket(removeMarket.id, removeMarket.supplier);
             groupMarkets.push(groupMarket);
-            await this.app.mongoService!.saveGroupMarket(groupMarket, time);
-            if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-                console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
+            if (save !== false) {
+                await this.app.mongoService!.saveGroupMarket(groupMarket, time);
+                if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+                    console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
+                }
+            } else if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
+                console.info("Market removed from this.markets", this.marketToString(groupMarket.markets[0]));
             }
         }
         this.removeGroupMarkets(groupMarkets);
@@ -226,6 +230,7 @@ export abstract class SupplierManager {
         const now = Date.now();
         const liveCompetitions = (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum));
         return (
+            market.event.competition.enum !== null &&
             !this.getMarketIsFinish(market) &&
             (
                 (

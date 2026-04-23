@@ -60,8 +60,8 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
         this.scrapSocketTask?.handleMarkets();
     }
 
-    async removeMarkets(ids: (string | number)[], time: number): Promise<void> {
-        await this._removeMarkets(ids, time);
+    async removeMarkets(ids: (string | number)[], time: number, save: boolean | undefined = undefined): Promise<void> {
+        await this._removeMarkets(ids, time, save);
         this.scrapSocketTask?.handleMarkets();
     }
 

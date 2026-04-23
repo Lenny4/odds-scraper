@@ -24,6 +24,7 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     name: string = "PolymarketBitcoinManager";
     app!: App;
     socketMarketId: number = 0;
+    nbMarkets: number = 0;
     markets: MarketInterface[] = [];
     socketMarkets: SocketMarketInterface[] = [];
     bitcoinPrices: TimeValueInterface[] = [];
@@ -38,7 +39,8 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
         this.listenWsBinance();
         const serie = await this._getSerie();
         for (const serieEvent of serie.events) {
-            await this.removeMarkets(this.markets.map(m => m.id), Date.now())
+            this.nbMarkets++;
+            await this.removeMarkets(this.markets.map(m => m.id), Date.now(), this.nbMarkets > 1)
             const event = await this._getEvent(serieEvent);
             this.addMarket(this.transformApiMarketToMarket({
                 polymarketMarket: event.markets[0],

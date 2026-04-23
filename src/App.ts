@@ -33,7 +33,10 @@ export default class App {
             ]
         }
     ];
-    readonly liveCompetitions: CompetitionEnum[] = [CompetitionEnum.Nba];
+    readonly liveCompetitions: CompetitionEnum[] = [
+        CompetitionEnum.Nba,
+        CompetitionEnum.BtcUpdown5m,
+    ];
 
     constructor() {
         this.mongoService = new MongoService(this);
