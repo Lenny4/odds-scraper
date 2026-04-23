@@ -54,7 +54,11 @@ export default class ScrapSocketTask {
     }
 
     public getExpectedNbSocketMarkets() {
-        return Math.ceil(this.orbitxManager.markets.length / Math.round(this.maxNbMarketPerSocket * this.ratioMarketPerSocket));
+        let r = Math.ceil(this.orbitxManager.markets.length / Math.round(this.maxNbMarketPerSocket * this.ratioMarketPerSocket));
+        if (r === 1 && this.orbitxManager.markets.length > 1) {
+            r = 2; // on essaye de toujours en ouvrir au moins 2 pour que assignMarketsToSocketMarkets change les markets entre les socketMarkets
+        }
+        return r;
     }
 
     public async handleMarkets(force: boolean = false, isRefreshSocket = false) {
@@ -133,7 +137,7 @@ export default class ScrapSocketTask {
                 socketMarket.markets.push(market);
                 socketMarket.nbModificationsOnMarkets += market.modificationsOnMarket?.length ?? 0;
             } else {
-                this.addConnectionToMarkets([market], 'close', 'could not find getBestSocketMarket');
+                this.orbitxManager.addConnectionToMarkets([market], 'close', 'could not find getBestSocketMarket');
                 // if (this.orbitxManager.socketMarkets.find(s => s.markets.length < this.maxNbMarketPerSocket)) {
                 //     const message = "getBestSocketMarket socketMarket is undefined " + this.getLogSocketMarketsState();
                 //     console.error(message);
@@ -170,7 +174,7 @@ export default class ScrapSocketTask {
                     socketMarket.lastReceivedMessage === undefined ||
                     socketMarket.lastReceivedMessage + this.timeoutOpenConnectionMessage < Date.now()
                 ) {
-                    this.addConnectionToMarkets(socketMarket.markets, 'close', "No response from server after sendListeningMarkets for " + this.timeoutOpenConnectionMessage + " ms, from: " + from, this.timeoutOpenConnectionMessage);
+                    this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'close', "No response from server after sendListeningMarkets for " + this.timeoutOpenConnectionMessage + " ms, from: " + from, this.timeoutOpenConnectionMessage);
                     socketMarket.websocket!.close();
                 }
             }, this.timeoutOpenConnectionMessage);
@@ -182,29 +186,6 @@ export default class ScrapSocketTask {
             eventId: market.event.id,
             marketId: market.id,
             applicationType: "WEB",
-        }
-    }
-
-    private addConnectionToMarkets(
-        markets: MarketInterface[],
-        type: 'open' | 'close',
-        message?: string,
-        minusTime: number = 0,
-    ) {
-        const now = Date.now();
-        for (const market of markets) {
-            if (
-                market.connections.length === 0 ||
-                market.connections[market.connections.length - 1].type !== type
-            ) {
-                market.connections.push({
-                    time: now - minusTime,
-                    type: type,
-                    ...(message && {
-                        message: message
-                    })
-                })
-            }
         }
     }
 
@@ -403,7 +384,7 @@ export default class ScrapSocketTask {
             } else if (string.startsWith('h')) {
                 // C’est un ping ou un heartbeat (h pour “heartbeat” souvent), pour maintenir la connexion WebSocket ouverte.
             } else if (string.startsWith('a')) {
-                this.addConnectionToMarkets(socketMarket.markets, 'open');
+                this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'open');
                 this.updateMarket(JSON.parse(JSON.parse(string.substring(1))))
             } else {
                 const message = 'Unknown message type websocket: ' + string;
@@ -518,7 +499,7 @@ export default class ScrapSocketTask {
                     // const message = "replaceSocketMarket is undefined, " + this.getLogSocketMarketsState();
                     // console.error(message);
                     // DiscordService.send(message);
-                    this.addConnectionToMarkets(notAssignedMarkets, 'close', 'no waitingSocketMarket available');
+                    this.orbitxManager.addConnectionToMarkets(notAssignedMarkets, 'close', 'no waitingSocketMarket available');
                 }
             }
         }

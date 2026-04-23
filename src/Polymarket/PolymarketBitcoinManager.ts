@@ -23,15 +23,16 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     socketMarketId: number = 0;
     markets: MarketInterface[] = [];
     socketMarkets: SocketMarketInterface[] = [];
+    bitcoinPrice: TimeValueInterface[] = [];
     private serieId: number = 10684;
     private wsBinance: WebSocket | null = null;
-    private bitcoinPrice: TimeValueInterface[] = [];
 
     constructor(app: App) {
         super(app)
     }
 
     async start() {
+        this.createWsBinance();
         const serie = await this._getSerie();
         for (const serieEvent of serie.events) {
             const event = await this._getEvent(serieEvent);
@@ -46,6 +47,9 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     }
 
     createWsBinance() {
+        if (this.wsBinance !== null) {
+            return;
+        }
         this.wsBinance = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
         this.wsBinance.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -59,7 +63,8 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
             }
         }
         this.wsBinance.onclose = (e) => {
-            console.error("this.wsBinance", e)
+            console.error("this.wsBinance", e);
+            this.wsBinance = null;
             this.createWsBinance();
         }
     }
@@ -138,7 +143,6 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
 
     private async watchMarkets() {
         return new Promise<void>(resolve => {
-            console.log(this.markets[0].event.name)
             setTimeout(() => {
                 this.closeSocketMarket(this.socketMarkets[0]);
                 resolve();

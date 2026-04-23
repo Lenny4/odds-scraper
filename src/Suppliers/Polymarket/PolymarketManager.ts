@@ -184,7 +184,6 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             }))
         });
         socketMarket.websocket!.on('close', (code) => { // each time error is called -> close is also call
-            console.log("[PolymarketTask] close", code);
             if (socketMarket!.pingInterval) {
                 clearInterval(socketMarket!.pingInterval);
             }
@@ -193,6 +192,8 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             }
             this.socketMarkets = this.socketMarkets.filter(sm => socketMarket.id !== sm.id);
             if (!socketMarket.closing) {
+                console.log("[PolymarketTask] close", code);
+                this.addConnectionToMarkets(socketMarket.markets, 'close');
                 this.connectMarkets();
             }
         });
@@ -335,10 +336,14 @@ export default class PolymarketManager extends SupplierManager implements Suppli
         ) {
             return false;
         }
+        this.addConnectionToMarkets(socketMarket.markets, 'open');
         socketMarket.lastReceivedMessage = Date.now();
         const markets: MarketInterface[] = [];
         for (const initialDump of initialDumps) {
-            const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id))!;
+            const market = this.markets.find(m => m.clobTokenIds!.includes(initialDump.asset_id));
+            if (!market || market.isSaving) {
+                continue;
+            }
             if (!markets.find(m => m.id === market.id)) {
                 markets.push(market);
                 market.modificationsOnMarket.push(now);

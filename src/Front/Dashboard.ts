@@ -1,9 +1,9 @@
 import App from "../App";
 import {Server} from "socket.io";
 import humanizeDuration from "humanize-duration";
-import {SupplierManager} from "../Suppliers/SupplierManager";
 import {DetailAppInterface, SocketMarketDetailChildInterface} from "../Interface/AppInterface";
 import {GroupMarketMessageInterface, MarketMessageInterface} from "../Interface/LiveInterface";
+import {MarketInterface} from "../Interface/MarketInterface";
 
 export default class Dashboard {
     public app: App;
@@ -38,6 +38,35 @@ export default class Dashboard {
         // todo
     }
 
+    marketToMarketMessage(m: MarketInterface) {
+        return {
+            marketRunners: m.marketRunners.map(mr => {
+                return {
+                    ...mr,
+                    odds: mr.odds.map(o => {
+                        return {
+                            ...o,
+                            values: [],
+                        }
+                    }),
+                }
+            }),
+            name: m.name,
+            odds: m.odds.map(o => {
+                return {
+                    ...o,
+                    values: [],
+                }
+            }),
+            runners: m.runners,
+            id: m.id,
+            supplier: m.supplier,
+            event: m.event,
+            endTime: m.endTime,
+            startTime: m.startTime,
+        } as MarketMessageInterface
+    }
+
     private async getDetails() {
         const now = Date.now();
 
@@ -47,31 +76,7 @@ export default class Dashboard {
                     id: gm.id,
                     startTime: gm.startTime,
                     markets: gm.markets.map(m => {
-                        const marketMessage: MarketMessageInterface = {
-                            marketRunners: m.marketRunners.map(mr => {
-                                return {
-                                    ...mr,
-                                    odds: mr.odds.map(o => {
-                                        return {
-                                            ...o,
-                                            values: [],
-                                        }
-                                    }),
-                                }
-                            }),
-                            name: m.name,
-                            odds: m.odds.map(o => {
-                                return {
-                                    ...o,
-                                    values: [],
-                                }
-                            }),
-                            runners: m.runners,
-                            id: m.id,
-                            supplier: m.supplier,
-                            event: m.event
-                        }
-                        return marketMessage
+                        return this.marketToMarketMessage(m)
                     })
                 };
                 return groupMarketMessage;

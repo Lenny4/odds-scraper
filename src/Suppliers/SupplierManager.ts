@@ -48,6 +48,29 @@ export abstract class SupplierManager {
         }
     }
 
+    addConnectionToMarkets(
+        markets: MarketInterface[],
+        type: 'open' | 'close',
+        message?: string,
+        minusTime: number = 0,
+    ) {
+        const now = Date.now();
+        for (const market of markets) {
+            if (
+                market.connections.length === 0 ||
+                market.connections[market.connections.length - 1].type !== type
+            ) {
+                market.connections.push({
+                    time: now - minusTime,
+                    type: type,
+                    ...(message && {
+                        message: message
+                    })
+                })
+            }
+        }
+    }
+
     initMarket(market: MarketInterface, supplier: string) {
         market.marketRunners = market.runners.map(r => {
             return {

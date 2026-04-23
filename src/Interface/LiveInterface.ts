@@ -1,6 +1,6 @@
 'use strict';
 
-import {EventInterface, MarketRunnerInterface, OddInterface, RunnerInterface} from "./MarketInterface";
+import {EventInterface, MarketInterface, MarketRunnerInterface, OddInterface, RunnerInterface} from "./MarketInterface";
 import {OddNameEnum, OddTypeEnum} from "../Enum/MarketEnum";
 
 export interface LiveMessageInterface {
@@ -16,6 +16,8 @@ export interface MarketMessageInterface {
     runners: RunnerInterface[];
     odds: OddInterface[];
     marketRunners: MarketRunnerInterface[];
+    startTime: MarketInterface['startTime'];
+    endTime: MarketInterface['endTime'];
 }
 
 

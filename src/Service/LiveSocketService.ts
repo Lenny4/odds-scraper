@@ -7,7 +7,6 @@ import {
     GroupMarketMessageInterface,
     GroupMarketRequestInterface,
     LiveMessageInterface,
-    MarketMessageInterface,
     OddReceiveInterface,
     OddRequestInterface
 } from "../Interface/LiveInterface";
@@ -66,7 +65,7 @@ export default class LiveSocketService {
                 );
                 for (const odd of odds) {
                     oddRequests.push({
-                        groupMarketId: groupMarket?.id, // groupMarket peut être undefined pour PolymarketBitcoinManager par exemple
+                        groupMarketId: groupMarket.id,
                         i: odd.nbValues,
                         index: odd.index,
                         marketId: market.id,
@@ -96,21 +95,7 @@ export default class LiveSocketService {
                 id: gm.id,
                 startTime: gm.startTime,
                 markets: gm.markets.map(m => {
-                    const marketMessage: MarketMessageInterface = {
-                        id: m.id,
-                        event: m.event,
-                        marketRunners: m.marketRunners.map(mr => {
-                            return {
-                                ...mr,
-                                odds: [],
-                            }
-                        }),
-                        name: m.name,
-                        odds: [],
-                        runners: m.runners,
-                        supplier: m.supplier,
-                    }
-                    return marketMessage;
+                    return this.app.dashboard.marketToMarketMessage(m);
                 }),
             };
             return groupMarketMessage;

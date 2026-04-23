@@ -41,6 +41,7 @@ export default class App {
         this.supplierManagers = [
             new OrbitxManager(this),
             new PolymarketManager(this),
+            new PolymarketBitcoinManager(this),
         ]
         this.polymarketBitcoinManager = new PolymarketBitcoinManager(this);
         this.dashboard = new Dashboard(this);
@@ -57,8 +58,8 @@ export default class App {
         // for (const manager of this.supplierManagers) {
         //     manager.start();
         // }
-        // this.dashboard.start()
-        // this.liveSocketService.start()
+        this.dashboard.start()
+        this.liveSocketService.start()
     }
 
     async stop() {

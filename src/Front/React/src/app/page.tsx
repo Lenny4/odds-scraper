@@ -582,7 +582,7 @@ export default function Home() {
     return (
         <main>
             <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                <Tabs value={value} onChange={handleChangeTab} aria-label="basic tabs example">
+                <Tabs value={value} onChange={handleChangeTab}>
                     <Tab label="Markets"/>
                     <Tab label="Socket Markets"/>
                 </Tabs>
