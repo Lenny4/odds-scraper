@@ -53,14 +53,6 @@ export default class LiveSocketService {
         });
     }
 
-    private filterOdds(odds: OddInterface[]) {
-        return odds.filter(o =>
-            o.nbValues < o.values.length &&
-            o.index === 0 &&
-            [OddNameEnum.RunnerOddValue, OddNameEnum.CryptoValue].includes(o.name)
-        );
-    }
-
     sendOddsMessage(markets: MarketInterface[]) {
         for (const market of markets) {
             const groupMarket = this.app.getGroupMarket(market.id, market.supplier);
@@ -91,6 +83,14 @@ export default class LiveSocketService {
 
     sendGroupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface) {
         this.io?.sockets.emit("message", this.groupMarketsMessage(groupMarketRequest));
+    }
+
+    private filterOdds(odds: OddInterface[]) {
+        return odds.filter(o =>
+            o.nbValues < o.values.length &&
+            o.index === 0 &&
+            [OddNameEnum.RunnerOddValue, OddNameEnum.CryptoValue].includes(o.name)
+        );
     }
 
     private addOddRequest(

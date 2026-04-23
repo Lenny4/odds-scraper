@@ -25,7 +25,7 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     socketMarketId: number = 0;
     markets: MarketInterface[] = [];
     socketMarkets: SocketMarketInterface[] = [];
-    bitcoinPrice: TimeValueInterface[] = [];
+    bitcoinPrices: TimeValueInterface[] = [];
     private serieId: number = 10684;
     private wsBinance: WebSocket | null = null;
 
@@ -60,14 +60,14 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
             const now = Date.now();
             const data = JSON.parse(event.data);
             const currentPrice = parseFloat(data.p);
-            if (this.bitcoinPrice.length === 0 || this.bitcoinPrice[this.bitcoinPrice.length - 1].v !== currentPrice) {
-                this.bitcoinPrice.push({
-                    i: this.bitcoinPrice.length + 1,
+            if (this.bitcoinPrices.length === 0 || this.bitcoinPrices[this.bitcoinPrices.length - 1].v !== currentPrice) {
+                this.bitcoinPrices.push({
+                    i: this.bitcoinPrices.length + 1,
                     v: currentPrice,
                     t: now,
                 });
                 if (this.markets.length === 1 && this.markets[0].odds[0].values.length === 0) {
-                    this.markets[0].odds[0].values = this.bitcoinPrice;
+                    this.markets[0].odds[0].values = this.bitcoinPrices;
                 }
                 this.app.liveSocketService.sendOddsMessage(this.markets);
             }
@@ -146,7 +146,10 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     }
 
     private clearBitcoinPrice() {
-        this.bitcoinPrice = this.bitcoinPrice.filter(bp => bp.t >= this.markets[0].startTime);
+        this.bitcoinPrices = this.bitcoinPrices.filter(bp => bp.t >= this.markets[0].startTime);
+        for (const [index, bitcoinPrice] of this.bitcoinPrices.entries()) {
+            bitcoinPrice.i = index;
+        }
     }
 
     private async _getEvent(serieEvent: PolymarketSerieEventInterface) {

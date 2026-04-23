@@ -18,6 +18,7 @@ export interface SerieInterface {
     name: string,
     values: number[],
     times: number[],
+    axe: string,
     color: SerieColorInterface,
     yMax: number | undefined;
     yMin: number | undefined;

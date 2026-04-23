@@ -196,6 +196,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             const odds = getOddsForOddRequest(market, oddRequest);
             for (const odd of odds) {
                 const serie: SerieInterface = {
+                    axe: odd.name.toString(),
                     yMax: undefined,
                     yMin: undefined,
                     name: odd.label,
@@ -336,10 +337,19 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                 size: 0
             },
             xaxis: xaxis ?? defaultXaxis,
-            yaxis: {
-                min: chartData.yMin! - (chartData.yMin! * 0.02),
-                max: chartData.yMax! + (chartData.yMin! * 0.02),
-            },
+            yaxis: chartData.series.map(s => {
+                const diff = (s.yMax! - s.yMin!) * 0.02;
+                const r: ApexOptions['yaxis'] = {
+                    seriesName: s.axe,
+                    opposite: s.axe === OddNameEnum.CryptoValue.toString(),
+                    min: s.yMin! - diff,
+                    max: s.yMax! + diff,
+                    labels: {
+                        formatter: (val, opts) => val ? val.toFixed(3) : val.toString(),
+                    }
+                }
+                return r
+            }),
             legend: {
                 show: true
             },
