@@ -53,6 +53,7 @@ export abstract class SupplierManager {
         type: 'open' | 'close',
         message?: string,
         minusTime: number = 0,
+        odds: OddNameEnum[] = [OddNameEnum.RunnerOddValue, OddNameEnum.RunnerOddVolume, OddNameEnum.MarketVolume],
     ) {
         const now = Date.now();
         for (const market of markets) {
@@ -62,6 +63,7 @@ export abstract class SupplierManager {
             ) {
                 market.connections.push({
                     time: now - minusTime,
+                    odds: odds,
                     type: type,
                     ...(message && {
                         message: message

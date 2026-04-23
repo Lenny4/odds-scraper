@@ -71,6 +71,7 @@ export interface MarketInterface extends MarketMessageInterface {
 export interface MarketConnectionInterface {
     type: string;
     time: number;
+    odds: OddNameEnum[];
 }
 
 export interface RunnerInterface {

@@ -18,16 +18,18 @@ import {SportEnum} from "../Enum/SportEnum";
 import {CompetitionEnum} from "../Enum/CompetitionEnum";
 import {OddNameEnum} from "../Enum/MarketEnum";
 import WebSocket from "ws";
+import DiscordService from "../Service/DiscordService";
 
 export default class PolymarketBitcoinManager extends PolymarketManager {
     static readonly url = 'https://gamma-api.polymarket.com';
     name: string = "PolymarketBitcoinManager";
     app!: App;
     socketMarketId: number = 0;
-    nbMarkets: number = 0;
+    saveMarket: boolean = false;
     markets: MarketInterface[] = [];
     socketMarkets: SocketMarketInterface[] = [];
     bitcoinPrices: TimeValueInterface[] = [];
+    oddsBinance: OddNameEnum[] = [OddNameEnum.CryptoValue];
     private serieId: number = 10684;
     private wsBinance: WebSocket | null = null;
 
@@ -39,8 +41,11 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
         this.listenWsBinance();
         const serie = await this._getSerie();
         for (const serieEvent of serie.events) {
-            this.nbMarkets++;
-            await this.removeMarkets(this.markets.map(m => m.id), Date.now(), this.nbMarkets > 1)
+            const marketIdsToRemove = this.markets.map(m => m.id);
+            await this.removeMarkets(marketIdsToRemove, Date.now(), this.saveMarket)
+            if (!this.saveMarket && marketIdsToRemove.length > 0) {
+                this.saveMarket = true;
+            }
             const event = await this._getEvent(serieEvent);
             this.addMarket(this.transformApiMarketToMarket({
                 polymarketMarket: event.markets[0],
@@ -69,8 +74,11 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
                     v: currentPrice,
                     t: now,
                 });
-                if (this.markets.length === 1 && this.markets[0].odds[0].values.length === 0) {
-                    this.markets[0].odds[0].values = this.bitcoinPrices;
+                if (this.markets.length === 1) {
+                    this.addConnectionToMarkets(this.markets, 'open', undefined, 0, this.oddsBinance);
+                    if (this.markets[0].odds[0].values.length === 0) {
+                        this.markets[0].odds[0].values = this.bitcoinPrices;
+                    }
                 }
                 this.app.liveSocketService.sendOddsMessage(this.markets);
             }
@@ -78,6 +86,13 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
         this.wsBinance.onclose = (e) => {
             console.error("this.wsBinance", e);
             this.wsBinance = null;
+            DiscordService.send(JSON.stringify({
+                event: "this.wsBinance",
+                message: e,
+            }))
+            if (this.markets.length === 1) {
+                this.addConnectionToMarkets(this.markets, 'close', undefined, 0, this.oddsBinance);
+            }
             this.listenWsBinance();
         }
     }
