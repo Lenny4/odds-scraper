@@ -17,6 +17,7 @@ import {
 import {SportEnum} from "../Enum/SportEnum";
 import {CompetitionEnum} from "../Enum/CompetitionEnum";
 import {OddNameEnum} from "../Enum/MarketEnum";
+import WebSocket from "ws";
 
 export default class PolymarketBitcoinManager extends PolymarketManager {
     static readonly url = 'https://gamma-api.polymarket.com';
@@ -58,7 +59,7 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
         this.wsBinance = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
         this.wsBinance.onmessage = (event) => {
             const now = Date.now();
-            const data = JSON.parse(event.data);
+            const data = JSON.parse(event.data.toString());
             const currentPrice = parseFloat(data.p);
             if (this.bitcoinPrices.length === 0 || this.bitcoinPrices[this.bitcoinPrices.length - 1].v !== currentPrice) {
                 this.bitcoinPrices.push({
