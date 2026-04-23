@@ -71,7 +71,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     const [options, setOptions] = useState<ApexOptions | undefined>(undefined)
     const [xaxis, setXaxis] = useState<ApexOptions['xaxis'] | undefined>(undefined)
     const [selectedOddRequests, setSelectedOddRequests] = useState<number[]>([])
-    const [groupSupplierOddRequests, setGroupSupplierOddRequests] = useState<GroupSupplierOddRequestInterface[]>(() => {
+    const [groupSupplierOddRequests] = useState<GroupSupplierOddRequestInterface[]>(() => {
         const result: GroupSupplierOddRequestInterface[] = [];
         for (const [indexOddRequest, oddRequest] of oddRequests.entries()) {
             let groupSupplierOddRequest = result.find(r => r.supplier === oddRequest.supplier);
@@ -183,12 +183,13 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
     const getChartData = () => {
         const now = Date.now();
         const chartData: ChartDataInterface = {
+            axes: [],
             allTimestamps: [],
             xMax: undefined,
             xMin: undefined,
             series: [],
             yMax: undefined,
-            yMin: undefined,
+            yMin: undefined
         };
         const timestampSet = new Set<number>();
         for (const oddRequest of getSelectedOddRequests()) {
@@ -196,6 +197,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             const odds = getOddsForOddRequest(market, oddRequest);
             for (const odd of odds) {
                 const serie: SerieInterface = {
+                    opposite: odd.name === OddNameEnum.CryptoValue,
                     axe: odd.name.toString(),
                     yMax: undefined,
                     yMin: undefined,
@@ -204,10 +206,24 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     times: [],
                     color: getColor(odd)
                 };
+                let axe = chartData.axes.find(a => a.name === serie.axe);
+                if (!axe) {
+                    axe = {
+                        name: serie.axe,
+                        yMax: undefined,
+                        yMin: undefined
+                    }
+                    chartData.axes.push(axe);
+                }
+
                 let v: number = 0;
                 let t: number = 0;
                 for (const oddValue of odd.values) {
-                    v = oddValue.v / 1000;
+                    if (odd.name === OddNameEnum.RunnerOddValue) {
+                        v = oddValue.v / 1000;
+                    } else {
+                        v = oddValue.v;
+                    }
                     t = oddValue.t;
                     serie.values.push(v);
                     serie.times.push(t);
@@ -216,6 +232,13 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     }
                     if (serie.yMin === undefined || v < serie.yMin) {
                         serie.yMin = v;
+                    }
+
+                    if (axe.yMax === undefined || v > axe.yMax) {
+                        axe.yMax = v;
+                    }
+                    if (axe.yMin === undefined || v < axe.yMin) {
+                        axe.yMin = v;
                     }
 
                     if (chartData.yMax === undefined || v > chartData.yMax) {
@@ -309,16 +332,16 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     allowMouseWheelZoom: false,
                 },
                 events: {
-                    scrolled: (chart, {xaxis}: { xaxis: { min: number; max: number; } }) => {
+                    scrolled: (_chart, {xaxis}: { xaxis: { min: number; max: number; } }) => {
                         updateXaxis(xaxis)
                     },
-                    zoomed: (chart, {xaxis}: { xaxis: { min: number; max: number; } }) => {
+                    zoomed: (_chart, {xaxis}: { xaxis: { min: number; max: number; } }) => {
                         if (applyZoomXaxis) {
                             updateXaxis(xaxis)
                         }
                         applyZoomXaxis = true;
                     },
-                    beforeResetZoom: (chart) => {
+                    beforeResetZoom: () => {
                         applyZoomXaxis = false;
                         updateXaxis(undefined)
                     },
@@ -338,16 +361,22 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             },
             xaxis: xaxis ?? defaultXaxis,
             yaxis: chartData.series.map(s => {
-                const diff = (s.yMax! - s.yMin!) * 0.02;
+                const axe = chartData.axes.find(a => a.name === s.axe)!;
+                const diff = (axe.yMax! - axe.yMin!) * 0.02;
                 const r: ApexOptions['yaxis'] = {
-                    seriesName: s.axe,
-                    opposite: s.axe === OddNameEnum.CryptoValue.toString(),
-                    min: s.yMin! - diff,
-                    max: s.yMax! + diff,
+                    seriesName: axe.name,
+                    opposite: s.opposite,
+                    min: axe.yMin! - diff,
+                    max: axe.yMax! + diff,
                     labels: {
-                        formatter: (val, opts) => val ? val.toFixed(3) : val.toString(),
+                        formatter: (val) => {
+                            if (val === null || val === undefined) return '';
+                            return val.toLocaleString('en-US', {maximumFractionDigits: 3});
+                        },
+                        show: axe.displayed !== true,
                     }
                 }
+                axe.displayed = true;
                 return r
             }),
             legend: {
@@ -469,7 +498,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
         }
         return oddRequests;
     };
-    const [oddRequests, setOddRequests] = useState<OddRequestInterface[]>(getOddRequests())
+    const [oddRequests] = useState<OddRequestInterface[]>(getOddRequests())
 
     const handleOddReceive = (oddReceives: OddReceiveInterface[]) => {
         const oddRequests: OddRequestInterface[] = [];
@@ -570,7 +599,7 @@ export default function Home() {
 
     const [value, setValue] = React.useState(0);
 
-    const handleChangeTab = (event: React.SyntheticEvent, newValue: number) => {
+    const handleChangeTab = (_event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
     };
 

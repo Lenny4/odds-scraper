@@ -2,9 +2,17 @@ export interface ChartDataInterface {
     yMax: number | undefined;
     yMin: number | undefined;
     series: SerieInterface[];
+    axes: ChartAxeInterface[];
     allTimestamps: number[];
     xMin: number | undefined;
     xMax: number | undefined;
+}
+
+export interface ChartAxeInterface {
+    name: string;
+    yMax: number | undefined;
+    yMin: number | undefined;
+    displayed?: boolean;
 }
 
 export interface SerieColorInterface {
@@ -19,6 +27,7 @@ export interface SerieInterface {
     values: number[],
     times: number[],
     axe: string,
+    opposite: boolean,
     color: SerieColorInterface,
     yMax: number | undefined;
     yMin: number | undefined;
