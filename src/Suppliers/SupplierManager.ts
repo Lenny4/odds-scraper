@@ -78,7 +78,9 @@ export abstract class SupplierManager {
                 odds: [],
             }
         });
-        market.event.competition.enum = this.getCompetitionEnum(market, supplier)
+        if (!market.event.competition.enum) {
+            market.event.competition.enum = this.getCompetitionEnum(market, supplier)
+        }
     }
 
     getMarketUrl(market: MarketInterface, encodeUri: boolean = false): string {
