@@ -265,7 +265,17 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
 
     const updateOption = () => {
         const chartData = getChartData();
-        const duration = Math.abs(chartData.allTimestamps[0] - chartData.allTimestamps[chartData.allTimestamps.length - 1]);
+        let duration = Math.abs(chartData.allTimestamps[0] - chartData.allTimestamps[chartData.allTimestamps.length - 1]);
+        const defaultXaxis: ApexOptions['xaxis'] = {
+            type: 'datetime',
+            min: Math.round(chartData.xMin! - duration * 0.02),
+            max: Math.round(chartData.xMax! + duration * 0.02)
+        };
+        if (groupMarketMessage.markets[0].startTime && groupMarketMessage.markets[0].endTime) {
+            duration = groupMarketMessage.markets[0].endTime - groupMarketMessage.markets[0].startTime;
+            defaultXaxis.min = Math.round(groupMarketMessage.markets[0].startTime - duration * 0.02)
+            defaultXaxis.max = Math.round(groupMarketMessage.markets[0].endTime - duration * 0.02)
+        }
         const options: ApexOptions = {
             series: chartData.series.map(s => {
                 return {
@@ -325,11 +335,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
             markers: {
                 size: 0
             },
-            xaxis: xaxis ?? {
-                type: 'datetime',
-                min: Math.round(chartData.xMin! - duration * 0.02),
-                max: Math.round(chartData.xMax! + duration * 0.02)
-            },
+            xaxis: xaxis ?? defaultXaxis,
             yaxis: {
                 min: chartData.yMin! - (chartData.yMin! * 0.02),
                 max: chartData.yMax! + (chartData.yMin! * 0.02),
@@ -389,10 +395,13 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                 {groupSupplierOddRequests.map(groupSupplierOddRequest => (
                     <FormGroup key={groupSupplierOddRequest.supplier}>
                         {groupSupplierOddRequest.oddRequests.map((or) => {
-                            if (or.index === 0 && or.name === OddNameEnum.RunnerOddValue) {
+                            if (
+                                (or.index === 0 && or.name === OddNameEnum.RunnerOddValue) ||
+                                or.name === OddNameEnum.CryptoValue
+                            ) {
                                 const market = groupMarketMessage.markets.find(m => m.id === or.marketId && m.supplier === or.supplier)!;
                                 const marketRunner: MarketRunnerInterface = getValueByPath(market, or.path.replace(".odds", ""));
-                                const runner = market.runners.find(r => r.id === marketRunner.runnerId)!;
+                                const runner = market.runners.find(r => r.id === marketRunner.runnerId);
                                 return (
                                     <FormControlLabel key={or.oddRequestIndex}
                                                       control={<Checkbox
@@ -401,7 +410,7 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                                                       label={JSON.stringify({
                                                           supplier: or.supplier,
                                                           type: or.type,
-                                                          name: runner.name
+                                                          name: runner?.name ?? or.name
                                                       })}/>
                                 )
                             }
@@ -423,6 +432,17 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
     const getOddRequests = () => {
         const oddRequests: OddRequestInterface[] = [];
         for (const market of groupMarketMessage.markets) {
+            for (const odd of market.odds) {
+                oddRequests.push({
+                    groupMarketId: groupMarketMessage.id,
+                    marketId: market.id,
+                    name: odd.name,
+                    type: odd.type,
+                    path: `odds`,
+                    supplier: market.supplier,
+                    index: odd.index,
+                });
+            }
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
                 for (const odd of marketRunner.odds) {
                     oddRequests.push({

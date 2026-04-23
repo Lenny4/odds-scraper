@@ -145,32 +145,6 @@ export abstract class SupplierManager {
             ))?.enum ?? null;
     }
 
-    addGroupMarket(market: MarketInterface): GroupMarketInterface {
-        for (const supplierManager of this.app.supplierManagers) {
-            if (market.supplier === supplierManager.name) {
-                continue;
-            }
-            const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
-            const matchingMarket = this.findMatchingMarket(market, markets);
-            if (matchingMarket) {
-                const groupMarket = this.app.getGroupMarket(matchingMarket.id, matchingMarket.supplier);
-                if (groupMarket) {
-                    this.groupMarketAddMarket(groupMarket, market);
-                    return groupMarket;
-                }
-            }
-        }
-        this.app.groupMarketId++;
-        const groupMarket: GroupMarketInterface = {
-            id: this.app.groupMarketId,
-            startTime: market.startTime,
-            markets: [],
-        }
-        this.app.groupMarkets.push(groupMarket);
-        this.groupMarketAddMarket(groupMarket, market);
-        return groupMarket;
-    }
-
     groupMarketAddMarket(groupMarket: GroupMarketInterface, market: MarketInterface) {
         groupMarket.markets.push(market);
         groupMarket.startTime = groupMarket.markets.reduce((sum, m) => sum + m.startTime, 0) / groupMarket.markets.length;
@@ -208,25 +182,6 @@ export abstract class SupplierManager {
         return null;
     }
 
-    removeGroupMarkets(groupMarkets: GroupMarketInterface[]) {
-        for (const groupMarket of groupMarkets) {
-            // Copier la liste pour éviter mutation pendant itération
-            const marketsToRemove = [...groupMarket.markets];
-            for (const market of marketsToRemove) {
-                const supplierManager = this.app.supplierManagers.find(sm => sm.name === market.supplier)!;
-                supplierManager.markets = supplierManager.markets.filter(m => m.id !== market.id);
-            }
-            // Suppression côté group en une seule fois
-            groupMarket.markets = groupMarket.markets.filter(
-                m => !marketsToRemove.some(rm => rm.id === m.id)
-            );
-            // Nettoyage des groupes vides
-            if (groupMarket.markets.length === 0) {
-                this.app.groupMarkets = this.app.groupMarkets.filter(gm => gm.id !== groupMarket.id);
-            }
-        }
-    }
-
     protected _addMarket(market: MarketInterface): void {
         if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
             console.info("Add new market " + this.marketToString(market));
@@ -239,6 +194,9 @@ export abstract class SupplierManager {
     }
 
     protected async _removeMarkets(marketIdsToRemove: (string | number)[], time: number) {
+        if (marketIdsToRemove.length === 0) {
+            return;
+        }
         const idSet = new Set(marketIdsToRemove);
         const marketsToRemove = this.markets.filter(m => idSet.has(m.id) && !m.isSaving);
         if (marketsToRemove.length === 0) {
@@ -278,6 +236,52 @@ export abstract class SupplierManager {
             (now + (15 * 60 * 1000) < market.startTime || liveCompetitions) &&
             [2, 3].includes(market.runners.length)
         );
+    }
+
+    private addGroupMarket(market: MarketInterface): GroupMarketInterface {
+        for (const supplierManager of this.app.supplierManagers) {
+            if (market.supplier === supplierManager.name) {
+                continue;
+            }
+            const markets = supplierManager.markets.filter(m => m.event.competition.enum === market.event.competition.enum);
+            const matchingMarket = this.findMatchingMarket(market, markets);
+            if (matchingMarket) {
+                const groupMarket = this.app.getGroupMarket(matchingMarket.id, matchingMarket.supplier);
+                if (groupMarket) {
+                    this.groupMarketAddMarket(groupMarket, market);
+                    return groupMarket;
+                }
+            }
+        }
+        this.app.groupMarketId++;
+        const groupMarket: GroupMarketInterface = {
+            id: this.app.groupMarketId,
+            startTime: market.startTime,
+            competition: market.event.competition.enum,
+            markets: [],
+        }
+        this.app.groupMarkets.push(groupMarket);
+        this.groupMarketAddMarket(groupMarket, market);
+        return groupMarket;
+    }
+
+    private removeGroupMarkets(groupMarkets: GroupMarketInterface[]) {
+        for (const groupMarket of groupMarkets) {
+            // Copier la liste pour éviter mutation pendant itération
+            const marketsToRemove = [...groupMarket.markets];
+            for (const market of marketsToRemove) {
+                const supplierManager = this.app.supplierManagers.find(sm => sm.name === market.supplier)!;
+                supplierManager.markets = supplierManager.markets.filter(m => m.id !== market.id);
+            }
+            // Suppression côté group en une seule fois
+            groupMarket.markets = groupMarket.markets.filter(
+                m => !marketsToRemove.some(rm => rm.id === m.id)
+            );
+            // Nettoyage des groupes vides
+            if (groupMarket.markets.length === 0) {
+                this.app.groupMarkets = this.app.groupMarkets.filter(gm => gm.id !== groupMarket.id);
+            }
+        }
     }
 
     private compareRunnerNames(a: string, b: string): number {

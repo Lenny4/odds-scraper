@@ -10,7 +10,7 @@ import {
     OddReceiveInterface,
     OddRequestInterface
 } from "../Interface/LiveInterface";
-import {MarketInterface, OddInterface} from "../Interface/MarketInterface";
+import {GroupMarketInterface, MarketInterface, OddInterface} from "../Interface/MarketInterface";
 import {getOddsForOddRequest} from "./Utils";
 import {OddNameEnum} from "../Enum/MarketEnum";
 
@@ -53,29 +53,37 @@ export default class LiveSocketService {
         });
     }
 
+    private filterOdds(odds: OddInterface[]) {
+        return odds.filter(o =>
+            o.nbValues < o.values.length &&
+            o.index === 0 &&
+            [OddNameEnum.RunnerOddValue, OddNameEnum.CryptoValue].includes(o.name)
+        );
+    }
+
     sendOddsMessage(markets: MarketInterface[]) {
         for (const market of markets) {
             const groupMarket = this.app.getGroupMarket(market.id, market.supplier);
             const oddRequests: OddRequestInterface[] = [];
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
-                const odds = marketRunner.odds.filter(o =>
-                    o.nbValues < o.values.length &&
-                    o.index === 0 &&
-                    o.name === OddNameEnum.RunnerOddValue
-                );
-                for (const odd of odds) {
-                    oddRequests.push({
-                        groupMarketId: groupMarket.id,
-                        i: odd.nbValues,
-                        index: odd.index,
-                        marketId: market.id,
-                        name: odd.name,
-                        path: `marketRunners[${indexMarketRunner}].odds`,
-                        supplier: odd.supplier,
-                        type: odd.type,
-                    });
-                    odd.nbValues = odd.values.length;
+                for (const odd of this.filterOdds(marketRunner.odds)) {
+                    this.addOddRequest(
+                        oddRequests,
+                        groupMarket,
+                        odd,
+                        market,
+                        `marketRunners[${indexMarketRunner}].odds`
+                    )
                 }
+            }
+            for (const odd of this.filterOdds(market.odds)) {
+                this.addOddRequest(
+                    oddRequests,
+                    groupMarket,
+                    odd,
+                    market,
+                    `odds`
+                )
             }
             this.io?.to(groupMarket.id.toString()).emit("message", this.oddsMessage(oddRequests));
         }
@@ -83,6 +91,26 @@ export default class LiveSocketService {
 
     sendGroupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface) {
         this.io?.sockets.emit("message", this.groupMarketsMessage(groupMarketRequest));
+    }
+
+    private addOddRequest(
+        oddRequests: OddRequestInterface[],
+        groupMarket: GroupMarketInterface,
+        odd: OddInterface,
+        market: MarketInterface,
+        path: string,
+    ) {
+        oddRequests.push({
+            groupMarketId: groupMarket.id,
+            i: odd.nbValues,
+            index: odd.index,
+            marketId: market.id,
+            name: odd.name,
+            path: path,
+            supplier: odd.supplier,
+            type: odd.type,
+        });
+        odd.nbValues = odd.values.length;
     }
 
     private groupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface): GroupMarketMessageInterface[] {

@@ -7,5 +7,5 @@ export enum SportEnum {
     Baseball = "baseball",
     Basketball = "basketball",
     AustralianRules = "australian-rules",
-    Bitcoin = "bitcoin",
+    Crypto = "crypto",
 }

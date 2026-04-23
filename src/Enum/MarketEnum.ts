@@ -15,4 +15,5 @@ export enum OddNameEnum {
     MarketVolume = "marketVolume",
     RunnerOddValue = "runnerOddValue",
     RunnerOddVolume = "runnerOddVolume",
+    CryptoValue = "cryptoValue",
 }

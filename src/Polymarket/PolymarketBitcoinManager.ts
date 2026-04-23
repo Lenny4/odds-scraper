@@ -15,6 +15,8 @@ import {
     TimeValueInterface
 } from "../Interface/MarketInterface";
 import {SportEnum} from "../Enum/SportEnum";
+import {CompetitionEnum} from "../Enum/CompetitionEnum";
+import {OddNameEnum} from "../Enum/MarketEnum";
 
 export default class PolymarketBitcoinManager extends PolymarketManager {
     static readonly url = 'https://gamma-api.polymarket.com';
@@ -32,40 +34,48 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     }
 
     async start() {
-        this.createWsBinance();
+        this.listenWsBinance();
         const serie = await this._getSerie();
         for (const serieEvent of serie.events) {
+            await this.removeMarkets(this.markets.map(m => m.id), Date.now())
             const event = await this._getEvent(serieEvent);
-            this.markets = [
-                this.transformApiMarketToMarket({polymarketMarket: event.markets[0], serie: serie, event: event})
-            ];
+            this.addMarket(this.transformApiMarketToMarket({
+                polymarketMarket: event.markets[0],
+                serie: serie,
+                event: event
+            }))
             this.clearBitcoinPrice();
             this.createSocketMarket();
-            await this.watchMarkets();
+            await this.waitMarketEnd();
         }
         this.start();
     }
 
-    createWsBinance() {
+    listenWsBinance() {
         if (this.wsBinance !== null) {
             return;
         }
         this.wsBinance = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
         this.wsBinance.onmessage = (event) => {
+            const now = Date.now();
             const data = JSON.parse(event.data);
             const currentPrice = parseFloat(data.p);
             if (this.bitcoinPrice.length === 0 || this.bitcoinPrice[this.bitcoinPrice.length - 1].v !== currentPrice) {
                 this.bitcoinPrice.push({
-                    i: 0,
+                    i: this.bitcoinPrice.length + 1,
                     v: currentPrice,
-                    t: Date.now(),
-                })
+                    t: now,
+                });
+                if (this.markets.length === 1 && this.markets[0].odds[0].values.length === 0) {
+                    this.markets[0].odds[0].values = this.bitcoinPrice;
+                }
+                this.app.liveSocketService.sendOddsMessage(this.markets);
             }
         }
         this.wsBinance.onclose = (e) => {
             console.error("this.wsBinance", e);
             this.wsBinance = null;
-            this.createWsBinance();
+            this.listenWsBinance();
         }
     }
 
@@ -86,20 +96,27 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
                 competition: {
                     id: serie.id,
                     name: serie.id.toString(),
-                    enum: null,
+                    enum: CompetitionEnum.BtcUpdown5m,
                     sport: {
                         id: "",
                         name: "",
-                        enum: SportEnum.Bitcoin,
+                        enum: SportEnum.Crypto,
                     }
                 }
             },
             supplier: this.name,
             id: polymarketMarket.id,
             inPlay: null,
-            odds: [],
+            odds: [{
+                index: 0,
+                name: OddNameEnum.CryptoValue,
+                supplier: this.name,
+                label: "Bitcoin value",
+                nbValues: 0,
+                values: []
+            }],
             marketRunners: [],
-            name: polymarketMarket.sportsMarketType,
+            name: polymarketMarket.question,
             numberOfWinners: 1,
             runners: JSON.parse(polymarketMarket.outcomes ?? "[]").map((name: string, index: number) => {
                 const runner: RunnerInterface = {
@@ -129,8 +146,7 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
     }
 
     private clearBitcoinPrice() {
-        const startTime = this.markets[0].startTime;
-        this.bitcoinPrice = this.bitcoinPrice.filter(bp => bp.t >= startTime);
+        this.bitcoinPrice = this.bitcoinPrice.filter(bp => bp.t >= this.markets[0].startTime);
     }
 
     private async _getEvent(serieEvent: PolymarketSerieEventInterface) {
@@ -141,12 +157,13 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
         return event;
     }
 
-    private async watchMarkets() {
+    private async waitMarketEnd() {
         return new Promise<void>(resolve => {
+            const now = Date.now();
             setTimeout(() => {
                 this.closeSocketMarket(this.socketMarkets[0]);
                 resolve();
-            }, this.markets[0].endTime! - Date.now());
+            }, this.markets[0].endTime! - now);
         });
     }
 

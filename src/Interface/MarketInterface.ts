@@ -93,7 +93,7 @@ export interface OddInterface {
     name: OddNameEnum; // odd value, odd volumes ...
     supplier: string;
     label: string; // to display on chart
-    type?: OddTypeEnum; // BACK, LAY for odd VALUE, Volume for odd volumes
+    type?: OddTypeEnum; // BACK, LAY
     index?: number;
     nbValues: number;
     values: TimeValueInterface[];
@@ -108,6 +108,7 @@ export interface TimeValueInterface {
 export interface GroupMarketInterface {
     id: number;
     startTime: number;
+    competition: CompetitionEnum | null;
     markets: MarketInterface[];
 }
 

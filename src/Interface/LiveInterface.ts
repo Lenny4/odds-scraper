@@ -17,7 +17,7 @@ export interface MarketMessageInterface {
     odds: OddInterface[];
     marketRunners: MarketRunnerInterface[];
     startTime: MarketInterface['startTime'];
-    endTime: MarketInterface['endTime'];
+    endTime?: MarketInterface['endTime'];
 }
 
 
