@@ -430,8 +430,8 @@ export default class ScrapSocketTask {
             if (market.status !== data.marketDefinition.status) {
                 market.status = this.orbitxManager.getStatus(data.marketDefinition.status);
             }
-            if (market.inPlay !== data.marketDefinition.inPlay) {
-                market.inPlay = data.marketDefinition.inPlay;
+            if (data.marketDefinition.inPlay && market.inPlayTime === null) {
+                market.inPlayTime = now;
             }
         }
         if (this.orbitxManager!.getMarketIsFinish(market)) {

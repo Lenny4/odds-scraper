@@ -109,7 +109,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             },
             supplier: this.name,
             id: polymarketMarket.id,
-            inPlay: null,
+            inPlayTime: null,
             odds: [],
             marketRunners: [],
             name: polymarketMarket.sportsMarketType,

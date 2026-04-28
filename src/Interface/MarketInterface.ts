@@ -53,7 +53,7 @@ export interface MarketInterface extends MarketMessageInterface {
     marketRunners: MarketRunnerInterface[];
     created: number;
     deleted: number | null;
-    inPlay: boolean | null;
+    inPlayTime: number | null;
     status: MarketStatusEnum | null;
     startTime: number;
     endTime?: number | null;
@@ -139,7 +139,7 @@ export interface MarketDefinitionRunnerInterface {
 }
 
 export interface MarketDefinitionInterface {
-    inPlay: true,
+    inPlay: boolean,
     status: string,
     runners: MarketDefinitionRunnerInterface[],
 }

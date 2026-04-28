@@ -124,7 +124,7 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
             },
             supplier: this.name,
             id: polymarketMarket.id,
-            inPlay: null,
+            inPlayTime: null,
             odds: [{
                 index: 0,
                 name: OddNameEnum.CryptoValue,

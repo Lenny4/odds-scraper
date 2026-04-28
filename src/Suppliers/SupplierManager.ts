@@ -107,7 +107,7 @@ export abstract class SupplierManager {
         if (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum)) {
             return false;
         }
-        return market.inPlay ?? false;
+        return market.inPlayTime !== null;
     }
 
     getCreateOdd(odds: OddInterface[], name: OddNameEnum, label: string, supplier: string, type: OddTypeEnum | undefined = undefined, index: number | undefined = undefined): OddInterface {

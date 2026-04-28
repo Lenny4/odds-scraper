@@ -92,7 +92,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
             },
             supplier: this.name,
             id: apiMarket.marketId,
-            inPlay: apiMarket.inPlay,
+            inPlayTime: null,
             odds: [],
             marketRunners: [],
             name: apiMarket.marketName,
