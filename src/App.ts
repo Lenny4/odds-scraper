@@ -9,12 +9,14 @@ import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
 import LiveSocketService from "./Service/LiveSocketService";
 import {SupplierInterface} from "./Interface/SupplierInterface";
 import PolymarketBitcoinManager from "./Polymarket/PolymarketBitcoinManager";
+import BetService from "./Service/BetService";
 
 export default class App {
     static readonly checkMarketModificationOnLast: number = 5 * 60_000;
     supplierManagers: SupplierInterface[] = [];
     mongoService: MongoService;
     liveSocketService: LiveSocketService;
+    betService: BetService;
     dashboard: Dashboard;
     groupMarketId: number = 0;
     groupMarkets: GroupMarketInterface[] = [];
@@ -47,6 +49,7 @@ export default class App {
         ]
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
+        this.betService = new BetService(this);
     }
 
     getGroupMarket(marketId: number | string, supplier: string) {
@@ -62,6 +65,7 @@ export default class App {
         }
         this.dashboard.start()
         this.liveSocketService.start()
+        this.betService.start()
     }
 
     async stop() {
