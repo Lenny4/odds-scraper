@@ -3,12 +3,11 @@
 import OrbitxManager from "./Suppliers/Orbitx/OrbitxManager";
 import MongoService from "./Service/MongoService";
 import Dashboard from "./Front/Dashboard";
-import {CompetitionMappingInterface, GroupMarketInterface} from "./Interface/MarketInterface";
+import {CompetitionMappingInterface, GroupMarketInterface, MarketInterface} from "./Interface/MarketInterface";
 import {CompetitionEnum} from "./Enum/CompetitionEnum";
 import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
 import LiveSocketService from "./Service/LiveSocketService";
 import {SupplierInterface} from "./Interface/SupplierInterface";
-import PolymarketBitcoinManager from "./Polymarket/PolymarketBitcoinManager";
 import BetService from "./Service/BetService";
 
 export default class App {
@@ -45,7 +44,7 @@ export default class App {
         this.supplierManagers = [
             new OrbitxManager(this),
             new PolymarketManager(this),
-            new PolymarketBitcoinManager(this),
+            // new PolymarketBitcoinManager(this),
         ]
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
@@ -54,6 +53,11 @@ export default class App {
 
     getGroupMarket(marketId: number | string, supplier: string) {
         return this.groupMarkets.find(gm => gm.markets.find(m => m.id === marketId && m.supplier === supplier))!;
+    }
+
+    afterUpdateMarkets(markets: MarketInterface[]) {
+        const groupMarkets = this.liveSocketService.sendOddsMessage(markets);
+        this.betService.bet(groupMarkets)
     }
 
     async start() {

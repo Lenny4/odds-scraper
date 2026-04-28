@@ -54,8 +54,10 @@ export default class LiveSocketService {
     }
 
     sendOddsMessage(markets: MarketInterface[]) {
+        const groupMarkets: GroupMarketInterface[] = [];
         for (const market of markets) {
             const groupMarket = this.app.getGroupMarket(market.id, market.supplier);
+            groupMarkets.push(groupMarket);
             const oddRequests: OddRequestInterface[] = [];
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {
                 for (const odd of this.filterOdds(marketRunner.odds)) {
@@ -79,6 +81,7 @@ export default class LiveSocketService {
             }
             this.io?.to(groupMarket.id.toString()).emit("message", this.oddsMessage(oddRequests));
         }
+        return groupMarkets;
     }
 
     sendGroupMarketsMessage(groupMarketRequest: GroupMarketRequestInterface) {

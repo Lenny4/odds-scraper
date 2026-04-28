@@ -1,11 +1,16 @@
 'use strict';
 
 import App from "../App";
-import {GroupMarketInterface} from "../Interface/MarketInterface";
+import {GroupMarketInterface, MarketRunnerInterface, OddInterface} from "../Interface/MarketInterface";
 import {CompetitionEnum} from "../Enum/CompetitionEnum";
+import PolymarketManager from "../Suppliers/Polymarket/PolymarketManager";
+import {OddNameEnum} from "../Enum/MarketEnum";
+import {getDerive} from "./Utils";
 
 export default class BetService {
+    private static readonly DERIVE_WINDOW_MS = 10_000;
     app: App;
+    name: string = "BetService";
     private betQueue: GroupMarketInterface[] = [];
     private isBetting: boolean = false;
 
@@ -38,19 +43,68 @@ export default class BetService {
 
     private async processQueue() {
         this.isBetting = true;
-        try {
-            while (this.betQueue.length > 0) {
-                const batch = this.betQueue.splice(0);
-                await this.processBatch(batch);
+        while (this.betQueue.length > 0) {
+            const batch = this.betQueue.splice(0);
+            await this.processBatch(batch);
+        }
+        this.isBetting = false;
+    }
+
+    private async processBatch(groupMarkets: GroupMarketInterface[]): Promise<void> {
+        const now = Date.now();
+        const oddName = OddNameEnum.PolymarketDerive;
+        for (const groupMarket of groupMarkets) {
+            const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
+            for (const marketRunner of polymarketMarket.marketRunners) {
+                const polymarketOdds = marketRunner.odds.filter(o =>
+                    o.supplier === PolymarketManager.name && o.index === 0
+                );
+                for (const polymarketOdd of polymarketOdds) {
+                    const oddDerivePolymarket = this.getOrCreateDeriveOdd(marketRunner, polymarketOdd, oddName);
+                    const deriveValue = getDerive(
+                        oddDerivePolymarket.values,
+                        now - BetService.DERIVE_WINDOW_MS
+                    );
+                    const last = oddDerivePolymarket.values.at(-1);
+                    if (!last || last.v !== deriveValue) {
+                        oddDerivePolymarket.values.push({
+                            i: oddDerivePolymarket.values.length,
+                            t: now,
+                            v: deriveValue,
+                        });
+                    } else {
+                        last.t = now;
+                    }
+                }
             }
-        } catch (e) {
-            throw e;
-        } finally {
-            this.isBetting = false;
         }
     }
 
-    private async processBatch(groupMarkets: GroupMarketInterface[]) {
-        const t = 0;
+    private getOrCreateDeriveOdd(
+        marketRunner: MarketRunnerInterface,
+        polymarketOdd: OddInterface,
+        oddName: OddNameEnum
+    ): OddInterface {
+        let odd = marketRunner.odds.find(o =>
+            o.name === oddName &&
+            o.supplier === this.name &&
+            o.index === polymarketOdd.index &&
+            o.type === polymarketOdd.type
+        );
+
+        if (!odd) {
+            odd = {
+                index: polymarketOdd.index,
+                label: `${polymarketOdd.label} derive`,
+                name: oddName,
+                nbValues: 0,
+                supplier: this.name,
+                type: polymarketOdd.type,
+                values: [],
+            };
+            marketRunner.odds.push(odd);
+        }
+
+        return odd;
     }
 }

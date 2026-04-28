@@ -371,7 +371,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 }
             }
         }
-        this.app.liveSocketService.sendOddsMessage(markets);
+        this.app.afterUpdateMarkets(markets);
         this.removeModificationsOnMarkets();
         return true;
     }

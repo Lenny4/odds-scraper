@@ -16,4 +16,5 @@ export enum OddNameEnum {
     RunnerOddValue = "runnerOddValue",
     RunnerOddVolume = "runnerOddVolume",
     CryptoValue = "cryptoValue",
+    PolymarketDerive = "polymarketDerive",
 }

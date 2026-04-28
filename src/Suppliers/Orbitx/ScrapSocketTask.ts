@@ -445,39 +445,38 @@ export default class ScrapSocketTask {
         this.orbitxManager.addOddValue(oddMarketVolume, valueMarketVolume, now)
         market.totalMatched = valueMarketVolume;
 
-        if (!data.rc) { // something data.rc is not send by socket
-            return;
-        }
-        for (const rc of data.rc) {
-            let marketRunner: MarketRunnerInterface | undefined = undefined;
-            if (market.runnersMap.hasOwnProperty(rc.id)) {
-                marketRunner = market.marketRunners.find(mr => mr.runnerId === market.runnersMap[rc.id]);
-            } else {
-                marketRunner = market.marketRunners.find(mr => mr.runnerId === rc.id);
-            }
-            if (!marketRunner) {
-                throw "marketRunner not founded";
-            }
-            const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
-            for (const type of this.types) {
-                // @ts-ignore
-                for (const bdat: BdatInterface of rc[type.prop]) {
-                    const valueOddValue = Math.round(bdat.odds * 1000);
-                    const oddLabel = this.orbitxManager.getOddLabel(runner, type.value, bdat.index, this.orbitxManager.name);
-                    if (valueOddValue >= 1) {
-                        const oddRunnerOddValue = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.orbitxManager.name, type.value, bdat.index);
-                        this.orbitxManager.addOddValue(oddRunnerOddValue, valueOddValue, now)
-                    }
+        if (data.rc) { // something data.rc is not send by socket
+            for (const rc of data.rc) {
+                let marketRunner: MarketRunnerInterface | undefined = undefined;
+                if (market.runnersMap.hasOwnProperty(rc.id)) {
+                    marketRunner = market.marketRunners.find(mr => mr.runnerId === market.runnersMap[rc.id]);
+                } else {
+                    marketRunner = market.marketRunners.find(mr => mr.runnerId === rc.id);
+                }
+                if (!marketRunner) {
+                    throw "marketRunner not founded";
+                }
+                const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
+                for (const type of this.types) {
+                    // @ts-ignore
+                    for (const bdat: BdatInterface of rc[type.prop]) {
+                        const valueOddValue = Math.round(bdat.odds * 1000);
+                        const oddLabel = this.orbitxManager.getOddLabel(runner, type.value, bdat.index, this.orbitxManager.name);
+                        if (valueOddValue >= 1) {
+                            const oddRunnerOddValue = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddValue, oddLabel, this.orbitxManager.name, type.value, bdat.index);
+                            this.orbitxManager.addOddValue(oddRunnerOddValue, valueOddValue, now)
+                        }
 
-                    const valueOddVolume = Math.round(bdat.amount);
-                    if (valueOddVolume > 0) {
-                        const oddRunnerOddVolume = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, this.orbitxManager.name, type.value, bdat.index);
-                        this.orbitxManager.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
+                        const valueOddVolume = Math.round(bdat.amount);
+                        if (valueOddVolume > 0) {
+                            const oddRunnerOddVolume = this.orbitxManager.getCreateOdd(marketRunner.odds, OddNameEnum.RunnerOddVolume, oddLabel, this.orbitxManager.name, type.value, bdat.index);
+                            this.orbitxManager.addOddValue(oddRunnerOddVolume, valueOddVolume, now)
+                        }
                     }
                 }
             }
         }
-        this.orbitxManager.app.liveSocketService.sendOddsMessage([market])
+        this.orbitxManager.app.afterUpdateMarkets([market]);
     }
 
     private switchOnWaitingSocketMarket(socketMarket: SocketMarketInterface) {
