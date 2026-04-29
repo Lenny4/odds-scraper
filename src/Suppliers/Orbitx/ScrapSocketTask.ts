@@ -69,21 +69,19 @@ export default class ScrapSocketTask {
             return;
         }
         this.isHandlingMarket = true;
-        this.needHandleMarket = false;
-        try {
-            await this.createWaitingSocketMarkets();
-            await this.createMarketSockets();
-        } catch (e: any) {
-            const message = "handleMarkets, " + e.toString() + " " + this.getLogSocketMarketsState();
-            console.error(message);
-            DiscordService.send(message);
-        } finally {
-            if (this.needHandleMarket) {
-                this.handleMarkets(true);
-            } else {
-                this.isHandlingMarket = false;
+        do {
+            this.needHandleMarket = false;
+            try {
+                await this.createWaitingSocketMarkets();
+                await this.createMarketSockets();
+            } catch (e: any) {
+                const message = "handleMarkets, " + e.toString() + " " + this.getLogSocketMarketsState();
+                console.error(message);
+                DiscordService.send(message);
             }
-        }
+        } while (this.needHandleMarket);
+
+        this.isHandlingMarket = false;
     }
 
     private getLogSocketMarketsState() {
