@@ -72,8 +72,6 @@ export default class BetService {
                             t: now,
                             v: deriveValue,
                         });
-                    } else {
-                        last.t = now;
                     }
                 }
             }
