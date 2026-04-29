@@ -6,6 +6,7 @@ export interface SocketMarketDetailChildInterface {
     lastReceivedMessageDiff?: string | undefined;
     markets: (string | number)[];
     newNbModificationsOnMarkets: number;
+    closing: boolean;
     websocket: | typeof WebSocket.CONNECTING
         | typeof WebSocket.OPEN
         | typeof WebSocket.CLOSING

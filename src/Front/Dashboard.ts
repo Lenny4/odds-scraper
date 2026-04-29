@@ -91,6 +91,7 @@ export default class Dashboard {
                             newNbModificationsOnMarkets: socketMarket.markets.reduce((sum, m) => {
                                 return sum + (m?.modificationsOnMarket?.length || 0);
                             }, 0),
+                            closing: socketMarket.closing,
                             websocket: socketMarket.websocket?.readyState,
                             ...(socketMarket.markets.length > 0 && {
                                 lastReceivedMessageDiff: humanizeDuration(now - (socketMarket.lastReceivedMessage ?? 0), {
