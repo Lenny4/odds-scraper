@@ -68,7 +68,7 @@ export default class BetService {
                     const last = oddDerivePolymarket.values.at(-1);
                     if (!last || last.v !== deriveValue) {
                         oddDerivePolymarket.values.push({
-                            i: oddDerivePolymarket.values.length,
+                            i: oddDerivePolymarket.values.length + 1,
                             t: now,
                             v: deriveValue,
                         });
@@ -87,7 +87,7 @@ export default class BetService {
     ): OddInterface {
         let odd = marketRunner.odds.find(o =>
             o.name === oddName &&
-            o.supplier === this.name &&
+            o.supplier === polymarketOdd.name &&
             o.index === polymarketOdd.index &&
             o.type === polymarketOdd.type
         );
@@ -98,7 +98,7 @@ export default class BetService {
                 label: `${polymarketOdd.label} derive`,
                 name: oddName,
                 nbValues: 0,
-                supplier: this.name,
+                supplier: polymarketOdd.name,
                 type: polymarketOdd.type,
                 values: [],
             };

@@ -435,12 +435,18 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                     <FormGroup key={groupSupplierOddRequest.supplier}>
                         {groupSupplierOddRequest.oddRequests.map((or) => {
                             if (
-                                (or.index === 0 && or.name === OddNameEnum.RunnerOddValue) ||
+                                (
+                                    or.index === 0 &&
+                                    (
+                                        or.name === OddNameEnum.RunnerOddValue ||
+                                        or.name === OddNameEnum.PolymarketDerive
+                                    )
+                                ) ||
                                 or.name === OddNameEnum.CryptoValue
                             ) {
                                 const market = groupMarketMessage.markets.find(m => m.id === or.marketId && m.supplier === or.supplier)!;
                                 const marketRunner: MarketRunnerInterface = getValueByPath(market, or.path.replace(".odds", ""));
-                                const runner = market.runners.find(r => r.id === marketRunner.runnerId);
+                                const runner = market.runners.find(r => r.id === marketRunner.runnerId)!;
                                 return (
                                     <FormControlLabel key={or.oddRequestIndex}
                                                       control={<Checkbox
@@ -449,7 +455,8 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
                                                       label={JSON.stringify({
                                                           supplier: or.supplier,
                                                           type: or.type,
-                                                          name: runner?.name ?? or.name
+                                                          runner: runner.name,
+                                                          name: or.name,
                                                       })}/>
                                 )
                             }
@@ -490,7 +497,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                         name: odd.name,
                         type: odd.type,
                         path: `marketRunners[${indexMarketRunner}].odds`,
-                        supplier: market.supplier,
+                        supplier: odd.supplier,
                         index: odd.index,
                     });
                 }
