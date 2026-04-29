@@ -485,7 +485,7 @@ function GroupMarket({initGroupMarketMessage}: { initGroupMarketMessage: GroupMa
                     name: odd.name,
                     type: odd.type,
                     path: `odds`,
-                    supplier: market.supplier,
+                    supplier: odd.supplier,
                     index: odd.index,
                 });
             }

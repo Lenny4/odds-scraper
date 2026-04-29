@@ -87,7 +87,7 @@ export default class BetService {
     ): OddInterface {
         let odd = marketRunner.odds.find(o =>
             o.name === oddName &&
-            o.supplier === polymarketOdd.name &&
+            o.supplier === polymarketOdd.supplier &&
             o.index === polymarketOdd.index &&
             o.type === polymarketOdd.type
         );
@@ -98,7 +98,7 @@ export default class BetService {
                 label: `${polymarketOdd.label} derive`,
                 name: oddName,
                 nbValues: 0,
-                supplier: polymarketOdd.name,
+                supplier: polymarketOdd.supplier,
                 type: polymarketOdd.type,
                 values: [],
             };
