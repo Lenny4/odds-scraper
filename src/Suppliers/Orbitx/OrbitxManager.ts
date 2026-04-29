@@ -101,6 +101,7 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
                 const runner: RunnerInterface = {
                     id: r.selectionId,
                     name: r.runnerName,
+                    matchings: {},
                 }
                 return runner;
             }),

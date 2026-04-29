@@ -74,9 +74,24 @@ export interface MarketConnectionInterface {
     odds: OddNameEnum[];
 }
 
+export interface RunnerMatch {
+    supplier: string;
+    id: number | string;
+}
+
+export interface MatchRunnerResult {
+    matchings: RunnerMatch[];
+}
+
+export interface MatchingRunnerInterface {
+    id: RunnerInterface['id'];
+    supplier: string;
+}
+
 export interface RunnerInterface {
     id: number | string;
     name: string;
+    matchings: Record<string, MatchingRunnerInterface>;
 }
 
 export interface RequestSocketMarketInterface {

@@ -4,6 +4,7 @@ import {
     GroupMarketInterface,
     MarketInterface,
     MatchingMarketInterface,
+    MatchRunnerResult,
     OddInterface,
     RunnerInterface,
     SocketMarketInterface
@@ -47,9 +48,6 @@ export abstract class SupplierManager {
             market.modificationsOnMarket = market.modificationsOnMarket?.filter(n => n > now - App.checkMarketModificationOnLast) ?? [];
         }
     }
-
-    private isEqualArray = (a: any[], b: any[]) =>
-        a.length === b.length && a.every((val, i) => val === b[i]);
 
     addConnectionToMarkets(
         markets: MarketInterface[],
@@ -156,9 +154,18 @@ export abstract class SupplierManager {
             ))?.enum ?? null;
     }
 
-    groupMarketAddMarket(groupMarket: GroupMarketInterface, market: MarketInterface) {
-        groupMarket.markets.push(market);
+    groupMarketAddMarket(groupMarket: GroupMarketInterface, newMarket: MarketInterface) {
+        groupMarket.markets.push(newMarket);
         groupMarket.startTime = groupMarket.markets.reduce((sum, m) => sum + m.startTime, 0) / groupMarket.markets.length;
+        if (groupMarket.markets.length > 1) {
+            for (const market of groupMarket.markets) {
+                if (market.id === newMarket.id) {
+                    continue;
+                }
+                const matchRunnerResults = this.matchRunners(newMarket, market);
+                this.addMatchingRunner([newMarket, market], matchRunnerResults)
+            }
+        }
     }
 
     findMatchingMarket(market: MarketInterface, markets: MarketInterface[]): MarketInterface | null {
@@ -252,6 +259,63 @@ export abstract class SupplierManager {
             (now + (15 * 60 * 1000) < market.startTime || liveCompetitions) &&
             [2, 3].includes(market.runners.length)
         );
+    }
+
+    private isEqualArray = (a: any[], b: any[]) =>
+        a.length === b.length && a.every((val, i) => val === b[i]);
+
+    private addMatchingRunner(markets: MarketInterface[], matchRunnerResults: MatchRunnerResult[]) {
+        for (const market of markets) {
+            for (const matchRunnerResult of matchRunnerResults) {
+                const thisMarketRunnerMatch = matchRunnerResult.matchings.find(m => m.supplier === market.supplier)!;
+                const runner = market.runners.find(r => r.id === thisMarketRunnerMatch.id)!;
+                for (const runnerMatch of matchRunnerResult.matchings) {
+                    if (runnerMatch.supplier === market.supplier) {
+                        continue;
+                    }
+                    runner.matchings[runnerMatch.supplier] = {
+                        id: runnerMatch.id,
+                        supplier: runnerMatch.supplier
+                    }
+                }
+            }
+        }
+    }
+
+    private matchRunners(source: MarketInterface, target: MarketInterface): MatchRunnerResult[] {
+        const sourceRunners = source.runners;
+        const targetRunners = target.runners;
+
+        // Build a score matrix: score[i][j] = similarity between sourceRunners[i] and targetRunners[j]
+        const scoreMatrix: number[][] = sourceRunners.map(s =>
+            targetRunners.map(t => this.compareRunnerNames(s.name, t.name))
+        );
+
+        // Find the optimal assignment using permutations of target indices
+        const targetIndices = targetRunners.map((_, i) => String(i));
+        const allPermutations = this.permute(targetIndices);
+
+        let bestPermutation: string[] = targetIndices;
+        let bestTotalScore = -Infinity;
+
+        for (const perm of allPermutations) {
+            const totalScore = perm.reduce((sum, targetIdx, sourceIdx) => {
+                return sum + scoreMatrix[sourceIdx][Number(targetIdx)];
+            }, 0);
+
+            if (totalScore > bestTotalScore) {
+                bestTotalScore = totalScore;
+                bestPermutation = perm;
+            }
+        }
+
+        // Build result using the best assignment
+        return bestPermutation.map((targetIdx, sourceIdx) => ({
+            matchings: [
+                {supplier: source.supplier, id: sourceRunners[sourceIdx].id},
+                {supplier: target.supplier, id: targetRunners[Number(targetIdx)].id},
+            ],
+        }));
     }
 
     private addGroupMarket(market: MarketInterface): GroupMarketInterface {

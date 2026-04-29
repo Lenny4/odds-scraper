@@ -140,6 +140,7 @@ export default class PolymarketBitcoinManager extends PolymarketManager {
                 const runner: RunnerInterface = {
                     id: JSON.parse(polymarketMarket.clobTokenIds ?? "[]")[index],
                     name: name,
+                    matchings: {},
                 }
                 return runner;
             }),

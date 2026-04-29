@@ -118,6 +118,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
                 const runner: RunnerInterface = {
                     id: JSON.parse(polymarketMarket.clobTokenIds ?? "[]")[index],
                     name: name,
+                    matchings: {},
                 }
                 return runner;
             }),
