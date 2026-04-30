@@ -91,8 +91,13 @@ export default class LiveSocketService {
     private filterOdds(odds: OddInterface[]) {
         return odds.filter(o =>
             o.nbValues < o.values.length &&
+            // todo remove above
             o.index === 0 &&
-            [OddNameEnum.RunnerOddValue, OddNameEnum.CryptoValue].includes(o.name)
+            [
+                OddNameEnum.RunnerOddValue,
+                OddNameEnum.CryptoValue,
+                OddNameEnum.PolymarketDerive,
+            ].includes(o.name)
         );
     }
 

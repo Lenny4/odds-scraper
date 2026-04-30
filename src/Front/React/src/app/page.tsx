@@ -27,6 +27,11 @@ type JsonProps = {
     json: unknown;
 }
 
+const SUPPLIER_HUE_SHIFT: Record<string, number> = {
+    "OrbitxManager": 0,
+    "PolymarketManager": 40,
+};
+
 let applyZoomXaxis = true;
 
 interface GroupSupplierOddRequestInterface {
@@ -126,11 +131,6 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
         });
     }
 
-    const SUPPLIER_HUE_SHIFT: Record<string, number> = {
-        "OrbitxManager": 0,
-        "PolymarketManager": 20,
-    };
-
     const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
         r /= 255;
         g /= 255;
@@ -172,9 +172,10 @@ function ChartGroupMarket({groupMarketMessage, oddRequests}: {
 
     const getColor = (odd: OddInterface): SerieColorInterface => {
         const baseColor: SerieColorInterface =
-            odd.type === OddTypeEnum.Back ? {r: 166, g: 216, b: 255, a: 1} :
-                odd.type === OddTypeEnum.Lay ? {r: 250, g: 201, b: 209, a: 1} :
-                    {r: 0, g: 0, b: 0, a: 0.5};
+            odd.name === OddNameEnum.PolymarketDerive ? {r: 250, g: 255, b: 0, a: 1} :
+                odd.type === OddTypeEnum.Back ? {r: 166, g: 216, b: 255, a: 1} :
+                    odd.type === OddTypeEnum.Lay ? {r: 250, g: 201, b: 209, a: 1} :
+                        {r: 0, g: 0, b: 0, a: 0.5};
 
         const hueShift = SUPPLIER_HUE_SHIFT[odd.supplier] ?? 0;
         return hueShift === 0 ? baseColor : shiftHue(baseColor, hueShift);
@@ -670,7 +671,7 @@ export default function Home() {
                         >
                             <AccordionSummary expandIcon={<ExpandMoreIcon/>}>
                                 <Typography component="span">
-                                    {`${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)} ${new Date(gm.startTime).toLocaleString("fr-FR", {
+                                    {`[${gm.id}]${market.event.competition.name} ${market.event.name} ${JSON.stringify(suppliers)} ${new Date(gm.startTime).toLocaleString("fr-FR", {
                                         day: "2-digit",
                                         month: "long",
                                         year: "numeric",

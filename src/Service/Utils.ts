@@ -20,26 +20,28 @@ export function getOddsForOddRequest(market: MarketInterface | MarketMessageInte
 function percentageDerivative(arr: number[]): number[] {
     const result: number[] = [];
     for (let i = 1; i < arr.length; i++) {
-        const change = ((arr[i] - arr[i - 1]) / arr[i - 1]) * 100;
-        result.push(+change.toFixed(2));
+        if (arr[i - 1] >= arr[i]) {
+            result.push((arr[i] / arr[i - 1]));
+        } else {
+            result.push(-(arr[i - 1] / arr[i]));
+        }
     }
     return result;
 }
 
-function average(arr: number[]): number | undefined {
-    if (arr.length === 0) return undefined;
-    return arr.reduce((sum, val) => sum + val, 0) / arr.length;
-}
-
 export function getDerive(values: TimeValueInterface[], since: number): number {
-    if (values.length < 2) return 1;
+    if (values.length < 2) {
+        return 1;
+    }
     const sequence: number[] = [];
     let i = values.length - 1;
     while (i >= 0 && (values[i].t >= since || i === values.length - 1)) {
         sequence.push(values[i].v);
         i--;
     }
-    if (sequence.length < 2) return 1;
+    if (sequence.length < 2) {
+        return 1;
+    }
     const derivative = percentageDerivative(sequence);
-    return average(derivative)!;
+    return derivative.reduce((sum, val) => sum + val, 0);
 }

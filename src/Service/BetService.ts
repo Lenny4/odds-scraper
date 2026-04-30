@@ -52,19 +52,17 @@ export default class BetService {
 
     private async processBatch(groupMarkets: GroupMarketInterface[]): Promise<void> {
         const now = Date.now();
-        const oddName = OddNameEnum.PolymarketDerive;
         for (const groupMarket of groupMarkets) {
             const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
             for (const marketRunner of polymarketMarket.marketRunners) {
                 const polymarketOdds = marketRunner.odds.filter(o =>
-                    o.supplier === PolymarketManager.name && o.index === 0
+                    o.supplier === PolymarketManager.name &&
+                    o.name === OddNameEnum.RunnerOddValue &&
+                    o.index === 0
                 );
                 for (const polymarketOdd of polymarketOdds) {
-                    const oddDerivePolymarket = this.getOrCreateDeriveOdd(marketRunner, polymarketOdd, oddName);
-                    const deriveValue = getDerive(
-                        oddDerivePolymarket.values,
-                        now - BetService.DERIVE_WINDOW_MS
-                    );
+                    const deriveValue = getDerive(polymarketOdd.values, now - BetService.DERIVE_WINDOW_MS);
+                    const oddDerivePolymarket = this.getOrCreateDeriveOdd(marketRunner, polymarketOdd, OddNameEnum.PolymarketDerive);
                     const last = oddDerivePolymarket.values.at(-1);
                     if (!last || last.v !== deriveValue) {
                         oddDerivePolymarket.values.push({
