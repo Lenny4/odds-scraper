@@ -31,7 +31,7 @@ function percentageDerivative(arr: number[]): number[] {
 
 export function getDerive(values: TimeValueInterface[], since: number): number {
     if (values.length < 2) {
-        return 1;
+        return 0;
     }
     const sequence: number[] = [];
     let i = values.length - 1;
@@ -40,7 +40,7 @@ export function getDerive(values: TimeValueInterface[], since: number): number {
         i--;
     }
     if (sequence.length < 2) {
-        return 1;
+        return 0;
     }
     const derivative = percentageDerivative(sequence);
     return derivative.reduce((sum, val) => sum + val, 0);
