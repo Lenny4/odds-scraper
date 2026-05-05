@@ -21,6 +21,7 @@ import {
     BalanceResponseInterface,
     BetActionInterface,
     BetActionsInterface,
+    BetConditionInterface,
     BetMarketInterface,
     BetslipSelectionInterface,
     CurrentBetInterface,
@@ -301,7 +302,42 @@ export default class BetService {
         if (onlyCancel) {
             return;
         }
+        const betCondition = this.getBetConditions(betActions);
+        if (!betCondition.oddMinMax) {
+            return;
+        }
+        // todo vérifier si on a la liability pour faire le balancing et les bets sinon faire que les bets
         this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
+    }
+
+    private getBetConditions(betActions: BetActionsInterface): BetConditionInterface {
+        let layBetLiability = (((Number(betActions.layBetAction.newBet?.price)) / 1000) - 1) * (Number(betActions.layBetAction.newBet?.size));
+        let backBetLiability = Number(betActions.backBetAction.newBet?.size);
+        let liability = Math.max(backBetLiability, layBetLiability);
+        let totalLiability = liability;
+        let balancingLiability = 0;
+        if (betActions.balancing !== null) {
+            const side = this.mappingBackLayLabel[betActions.balancing.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
+            if (side === OddTypeEnum.Back) {
+                balancingLiability = Number(betActions.balancing.size);
+                totalLiability = Math.max(backBetLiability + balancingLiability, layBetLiability)
+            } else {
+                balancingLiability = ((((Number(betActions.balancing.price)) / 1000) - 1) * (Number(betActions.balancing.size)));
+                totalLiability = Math.max(
+                    backBetLiability,
+                    layBetLiability + balancingLiability
+                )
+            }
+        }
+        const minOdd = 1.1;
+        return {
+            balancingLiability: Math.ceil(balancingLiability * 100) / 100,
+            betLiability: Math.ceil(liability * 100) / 100,
+            totalLiability: Math.ceil(totalLiability * 100) / 100,
+            oddMinMax:
+                Number(betActions.backBetAction.newBet?.price ?? 0) > (minOdd * 1000) &&
+                Number(betActions.layBetAction.newBet?.price ?? 0) < ((minOdd * 10) * 1000)
+        }
     }
 
     private async cancelBets(marketId: MarketInterface['id'], betToCancels: CurrentBetInterface[]) {

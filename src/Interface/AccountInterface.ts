@@ -65,6 +65,13 @@ export interface BetActionsInterface {
     marketId: MarketInterface['id'],
 }
 
+export interface BetConditionInterface {
+    betLiability: number;
+    totalLiability: number;
+    balancingLiability: number;
+    oddMinMax: boolean;
+}
+
 export interface BetMarketInterface {
     isBeyondMarket: boolean,
     isAtMarket: boolean,
