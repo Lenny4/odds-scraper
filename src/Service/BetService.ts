@@ -20,6 +20,8 @@ import {
     AccountInterface,
     BalanceResponseInterface,
     BetActionInterface,
+    BetActionsInterface,
+    BetMarketInterface,
     BetslipSelectionInterface,
     CurrentBetInterface,
     CurrentBetsResponseInterface,
@@ -32,6 +34,7 @@ import {
 export default class BetService {
     static readonly MIN_BET_AMOUNT = 7;
     static readonly DEFAULT_BET_AMOUNT = BetService.MIN_BET_AMOUNT;
+    static readonly MIN_SIZE = 0.01;
     private static readonly DERIVE_WINDOW_MS = 10_000;
     app: App;
     name: string = "BetService";
@@ -221,19 +224,40 @@ export default class BetService {
 
     private async processBatch(groupMarkets: GroupMarketInterface[]): Promise<void> {
         const now = Date.now();
+        let betActions: BetActionsInterface[] = [];
         for (const groupMarket of groupMarkets) {
             const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
             for (const polymarketMarketRunner of polymarketMarket.marketRunners) {
                 this.updateDeriveOddValues(polymarketMarketRunner, now)
             }
             const orbitxMarket = groupMarket.markets.find(m => m.supplier === OrbitxManager.name)!;
-            this.getBetsTodo(groupMarket, this.account.currentBets.filter(b => b.marketId === orbitxMarket.id));
+            betActions = [...betActions, ...this.getBetsTodo(groupMarket, this.account.currentBets.filter(b => b.marketId === orbitxMarket.id))];
+        }
+        if (betActions.length > 0) {
+            const closestToOddValue = 2;
+            betActions.sort((a, b) => {
+                if (a.balancing !== null && b.balancing === null) {
+                    return -1;
+                }
+                if (a.balancing === null && b.balancing !== null) {
+                    return 1;
+                }
+                const aOddValues = [a.backBetAction.newBet?.price ?? 0, a.layBetAction.newBet?.price ?? 0]
+                const bOddValues = [b.backBetAction.newBet?.price ?? 0, b.layBetAction.newBet?.price ?? 0]
+                const aAvg = aOddValues.reduce((sum, num) => sum + num, 0) / aOddValues.length;
+                const bAvg = bOddValues.reduce((sum, num) => sum + num, 0) / bOddValues.length;
+                return Math.abs((aAvg / (closestToOddValue * 1000)) - 1) - Math.abs((bAvg / (closestToOddValue * 1000)) - 1);
+            })
+            for (const [index, betAction] of betActions.entries()) {
+                this.doBetActions(betAction, index > 0);
+            }
         }
     }
 
-    private getBetsTodo(groupMarket: GroupMarketInterface, bets: CurrentBetInterface[]) {
+    private getBetsTodo(groupMarket: GroupMarketInterface, bets: CurrentBetInterface[]): BetActionsInterface[] {
         const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
         const orbitxMarket = groupMarket.markets.find(m => m.supplier === OrbitxManager.name)!;
+        const betActions: BetActionsInterface[] = [];
         for (const orbitxMarketRunner of orbitxMarket.marketRunners) {
             const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!;
             const polymarketMarketRunner = polymarketMarket.marketRunners.find(mr =>
@@ -260,23 +284,24 @@ export default class BetService {
                 backMarketRunnerBetState,
                 layMarketRunnerBetState
             );
-            if (betslipBalancing !== null) {
-                for (const betSlip of [backBetslip, layBetslip]) {
-                    if (betslipBalancing.side === betSlip.newBet?.side) {
-                        betSlip.newBet.size = Number(betSlip.newBet.size) + Number(betslipBalancing.size);
-                        break;
-                    }
-                }
-            }
-            this.doBetslips(orbitxMarket.id, backBetslip, layBetslip)
+            betActions.push({
+                backBetAction: backBetslip,
+                balancing: betslipBalancing,
+                layBetAction: layBetslip,
+                marketId: orbitxMarket.id,
+            })
         }
+        return betActions;
     }
 
-    private doBetslips(marketId: MarketInterface['id'], backBetslip: BetActionInterface, layBetslip: BetActionInterface) {
-        this.preventBetActionSameSize(backBetslip, layBetslip);
-        for (const betAction of [backBetslip, layBetslip]) {
-            this.cancelBets(marketId, betAction.betToCancels);
+    private doBetActions(betActions: BetActionsInterface, onlyCancel: boolean = false) {
+        for (const betAction of [betActions.backBetAction, betActions.layBetAction]) {
+            this.cancelBets(betActions.marketId, betAction.betToCancels);
         }
+        if (onlyCancel) {
+            return;
+        }
+        this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
     }
 
     private async cancelBets(marketId: MarketInterface['id'], betToCancels: CurrentBetInterface[]) {
@@ -337,8 +362,7 @@ export default class BetService {
     }
 
     private addSize(betslip: BetActionInterface, oppositeBetslip: BetActionInterface, originalBetslipSize: number) {
-        const add = 0.01;
-        betslip.newBet!.size = Number(betslip.newBet) + add;
+        betslip.newBet!.size = Number(betslip.newBet) + BetService.MIN_SIZE;
         if (oppositeBetslip.newBet) {
             oppositeBetslip.newBet!.size = Number(oppositeBetslip.newBet) * (betslip.newBet!.size / originalBetslipSize);
         }
@@ -376,18 +400,36 @@ export default class BetService {
             selectionId: Number(backMarketRunnerBetState.runnerId),
             betUuid: this.getBetUuid(marketId, backMarketRunnerBetState.runnerId),
         }
+        let type: OddTypeEnum | null = null;
+        let marketRunnerBetState: MarketRunnerBetStateInterface | null = null;
+        let oppositeMarketRunnerBetState: MarketRunnerBetStateInterface | null = null;
         if (sumBetOdd.back > sumBetOdd.lay) {
+            type = OddTypeEnum.Lay;
+            marketRunnerBetState = layMarketRunnerBetState;
+            oppositeMarketRunnerBetState = backMarketRunnerBetState;
             betslipSelection.price = backMarketRunnerBetState.oddValue!;
             betslipSelection.size = Math.abs(sumBetOdd.back - sumBetOdd.lay) / betslipSelection.price;
-            betslipSelection.side = this.reverseMappingBackLayLabel[OddTypeEnum.Lay].toUpperCase();
+            betslipSelection.side = this.reverseMappingBackLayLabel[type].toUpperCase();
         } else if (sumBetOdd.lay > sumBetOdd.back) {
+            type = OddTypeEnum.Back;
+            marketRunnerBetState = backMarketRunnerBetState;
+            oppositeMarketRunnerBetState = layMarketRunnerBetState;
             betslipSelection.price = layMarketRunnerBetState.oddValue!;
             betslipSelection.size = Math.abs(sumBetOdd.back - sumBetOdd.lay) / betslipSelection.price;
-            betslipSelection.side = this.reverseMappingBackLayLabel[OddTypeEnum.Back].toUpperCase();
-        } else {
-            return null;
+            betslipSelection.side = this.reverseMappingBackLayLabel[type].toUpperCase();
         }
-        return betslipSelection;
+        if (Number(betslipSelection.size) > BetService.MIN_SIZE && type !== null) {
+            const betMarket = this.getBetMarket(
+                type,
+                marketRunnerBetState!.oddValue!,
+                oppositeMarketRunnerBetState!.oddValue!,
+                marketRunnerBetState!.direction,
+            );
+            if (!betMarket.isMovingAgainstBet) {
+                return betslipSelection;
+            }
+        }
+        return null;
     }
 
     private getBetUuid(marketId: MarketInterface['id'], runnerId: RunnerInterface['id']) {
@@ -425,19 +467,15 @@ export default class BetService {
             }
             if (oppositeMarketRunnerBetState.oddValue) {
                 const betOddValue = Number(bet.price) * 1000;
-                const isBack = marketRunnerBetState.type === OddTypeEnum.Back;
-                const isBeyondMarket = isBack
-                    ? betOddValue > oppositeMarketRunnerBetState.oddValue
-                    : betOddValue < oppositeMarketRunnerBetState.oddValue;
-                const isAtMarket = isBack
-                    ? betOddValue === oppositeMarketRunnerBetState.oddValue
-                    : betOddValue === oppositeMarketRunnerBetState.oddValue;
-                const isMovingAgainstBet =
-                    marketRunnerBetState.direction &&
-                    !this.betDirections[marketRunnerBetState.type].includes(marketRunnerBetState.direction);
-                if (isBeyondMarket || (isAtMarket && isMovingAgainstBet)) {
+                const betMarket = this.getBetMarket(
+                    marketRunnerBetState.type,
+                    betOddValue,
+                    oppositeMarketRunnerBetState.oddValue,
+                    marketRunnerBetState.direction,
+                );
+                if (betMarket.isBeyondMarket || (betMarket.isAtMarket && betMarket.isMovingAgainstBet)) {
                     betAction.betToCancels.push(bet);
-                } else if (isAtMarket) {
+                } else if (betMarket.isAtMarket) {
                     betFounded = true;
                 }
             }
@@ -457,6 +495,29 @@ export default class BetService {
             }
         }
         return betAction;
+    }
+
+    private getBetMarket(
+        type: OddTypeEnum,
+        betOddValue: number,
+        oppositeBetOddValue: number,
+        direction: DirectionEnum | null,
+    ): BetMarketInterface {
+        const isBack = type === OddTypeEnum.Back;
+        const isBeyondMarket = isBack
+            ? betOddValue > oppositeBetOddValue
+            : betOddValue < oppositeBetOddValue;
+        const isAtMarket = isBack
+            ? betOddValue === oppositeBetOddValue
+            : betOddValue === oppositeBetOddValue;
+        const isMovingAgainstBet =
+            direction !== null &&
+            !this.betDirections[type].includes(direction);
+        return {
+            isAtMarket: isAtMarket,
+            isBeyondMarket: isBeyondMarket,
+            isMovingAgainstBet: isMovingAgainstBet
+        }
     }
 
     private getMarketRunnerBetState(orbitxMarketRunner: MarketRunnerInterface, polymarketMarketRunner: MarketRunnerInterface, type: OddTypeEnum): MarketRunnerBetStateInterface {

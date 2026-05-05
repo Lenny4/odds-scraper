@@ -1,7 +1,7 @@
 'use strict';
 
 import {DirectionEnum, OddTypeEnum} from "../Enum/MarketEnum";
-import {RunnerInterface} from "./MarketInterface";
+import {MarketInterface, RunnerInterface} from "./MarketInterface";
 
 export interface AccountInterface {
     balance: number;
@@ -57,6 +57,20 @@ export interface BetActionInterface {
     betToCancels: CurrentBetInterface[];
     newBet: BetslipSelectionInterface | null;
 }
+
+export interface BetActionsInterface {
+    backBetAction: BetActionInterface,
+    layBetAction: BetActionInterface,
+    balancing: BetslipSelectionInterface | null,
+    marketId: MarketInterface['id'],
+}
+
+export interface BetMarketInterface {
+    isBeyondMarket: boolean,
+    isAtMarket: boolean,
+    isMovingAgainstBet: boolean,
+}
+
 
 export interface CurrentBetInterface {
     offerId: number | undefined;
