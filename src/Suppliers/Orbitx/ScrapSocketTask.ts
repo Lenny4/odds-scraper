@@ -96,7 +96,7 @@ export default class ScrapSocketTask {
                 if (loopCount === 10) {
                     DiscordService.send("loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
                 }
-                while (!this.orbitxManager.connectedUntil === null) {
+                while (this.orbitxManager.connectedUntil === null) {
                     await new Promise(resolve2 => setTimeout(resolve2, 1_000));
                 }
                 // region create page
