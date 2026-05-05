@@ -59,7 +59,7 @@ export interface BetActionInterface {
 }
 
 export interface CurrentBetInterface {
-    offerId: number;
+    offerId: number | undefined;
     marketId: string;
     eventId: string;
     raceId: string;

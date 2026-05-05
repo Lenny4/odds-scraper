@@ -39,6 +39,7 @@ export default class BetService {
         balance: 0,
         currentBets: [],
     };
+    private cancellingBets: Set<number> = new Set();
     private betQueue: GroupMarketInterface[] = [];
     private isBetting: boolean = false;
     private accountWebsocket: WebSocket | null = null;
@@ -91,7 +92,7 @@ export default class BetService {
         this.enqueue(groupMarkets.filter(gm =>
             gm.competition === CompetitionEnum.Nba &&
             gm.markets.length > 1 &&
-            gm.markets.find(m => m.id === "1.257696916")
+            gm.markets.find(m => m.id === "1.257752587")
         ));
         if (this.isBetting) return;
         await this.processQueue();
@@ -99,7 +100,7 @@ export default class BetService {
 
     private async createAccountWebsocket(): Promise<void> {
         const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
-        while (!orbitxManager.connectedUntil === null) {
+        while (orbitxManager.connectedUntil === null) {
             await new Promise(resolve2 => setTimeout(resolve2, 1_000));
         }
         const browser = await BrowserManager.acquire(OrbitxManager.cache);
@@ -162,6 +163,7 @@ export default class BetService {
                 }
             } else {
                 const message = 'Unknown message type websocket: ' + string;
+                console.error(message);
                 DiscordService.send(message)
                 throw message;
             }
@@ -185,7 +187,8 @@ export default class BetService {
                 (
                     b.offerId === undefined &&
                     b.side === newBet.side &&
-                    b.size === newBet.size
+                    Number(b.price) === Number(newBet.price) &&
+                    Number(b.size) === Number(newBet.size)
                 )
             );
             if (currentBetIndex >= 0) {
@@ -232,7 +235,7 @@ export default class BetService {
         const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
         const orbitxMarket = groupMarket.markets.find(m => m.supplier === OrbitxManager.name)!;
         for (const orbitxMarketRunner of orbitxMarket.marketRunners) {
-            const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!
+            const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!;
             const polymarketMarketRunner = polymarketMarket.marketRunners.find(mr =>
                 mr.runnerId === orbitxRunner.matchings[PolymarketManager.name].id)!;
 
@@ -245,7 +248,7 @@ export default class BetService {
             const backBetslip = this.getBetslips(orbitxMarket.id, bets, backMarketRunnerBetState, layMarketRunnerBetState, undefined);
             const layBetslip = this.getBetslips(orbitxMarket.id, bets, layMarketRunnerBetState, backMarketRunnerBetState, backBetslip.newBet?.size ? Number(backBetslip.newBet.size) : undefined);
 
-            const betsToCancelId = new Set([backBetslip, layBetslip].flatMap(b => b.betToCancels.map(bc => bc.offerId)));
+            const betsToCancelId = new Set([backBetslip, layBetslip].flatMap(b => b.betToCancels.map(bc => bc.offerId))) as Set<number>;
             const betslipBalancing = this.getBetslipSelectionBalancing(
                 orbitxMarket.id,
                 [
@@ -259,21 +262,95 @@ export default class BetService {
             );
             if (betslipBalancing !== null) {
                 for (const betSlip of [backBetslip, layBetslip]) {
-                    if (
-                        betslipBalancing.side === betSlip.newBet?.side &&
-                        betslipBalancing.price === betSlip.newBet?.price
-                    ) {
+                    if (betslipBalancing.side === betSlip.newBet?.side) {
                         betSlip.newBet.size = Number(betSlip.newBet.size) + Number(betslipBalancing.size);
                         break;
                     }
                 }
             }
+            this.doBetslips(orbitxMarket.id, backBetslip, layBetslip)
         }
     }
 
-    private doBetslips() {
-        // todo change prices so there is no 2 same size
-        const t = 0;
+    private doBetslips(marketId: MarketInterface['id'], backBetslip: BetActionInterface, layBetslip: BetActionInterface) {
+        this.preventBetActionSameSize(backBetslip, layBetslip);
+        for (const betAction of [backBetslip, layBetslip]) {
+            this.cancelBets(marketId, betAction.betToCancels);
+        }
+    }
+
+    private async cancelBets(marketId: MarketInterface['id'], betToCancels: CurrentBetInterface[]) {
+        betToCancels = betToCancels.filter(b => !this.cancellingBets.has(b.offerId as number));
+        if (betToCancels.length === 0) {
+            return;
+        }
+        const offerIds: number[] = [];
+        for (const betToCancel of betToCancels) {
+            offerIds.push(betToCancel.offerId as number);
+            this.cancellingBets.add(betToCancel.offerId as number);
+        }
+        try {
+            const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
+            console.log("cancelBets", betToCancels.map(b => {
+                return {
+                    selectionName: b.selectionName,
+                    side: b.side,
+                    price: b.price,
+                    size: b.size,
+                }
+            }))
+            const res = await fetch("https://www.orbitxch.com/customer/api/cancelBets", {
+                headers: orbitxManager.headers,
+                body: JSON.stringify({
+                    [marketId]: betToCancels,
+                }),
+                method: "POST",
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === "OK" && data.error === null && data.betDelay === null) {
+                    this.account.currentBets = this.account.currentBets.filter(b => !offerIds.includes(b.offerId as number))
+                } else {
+                    console.error("res cancelBets", data);
+                }
+            }
+        } catch (e) {
+            console.error("cancelBets but error: ", e);
+        } finally {
+            for (const betToCancel of betToCancels) {
+                this.cancellingBets.delete(betToCancel.offerId as number);
+            }
+        }
+    }
+
+    private preventBetActionSameSize(backBetslip: BetActionInterface, layBetslip: BetActionInterface) {
+        while (this.hasPendingBetWithSameSize(backBetslip.newBet) || this.hasPendingBetWithSameSize(layBetslip.newBet)) {
+            const backSize = Number(backBetslip.newBet?.size ?? 0);
+            while (this.hasPendingBetWithSameSize(backBetslip.newBet)) {
+                this.addSize(backBetslip, layBetslip, backSize)
+            }
+            const laySize = Number(layBetslip.newBet?.size ?? 0);
+            while (this.hasPendingBetWithSameSize(layBetslip.newBet)) {
+                this.addSize(layBetslip, backBetslip, laySize)
+            }
+        }
+    }
+
+    private addSize(betslip: BetActionInterface, oppositeBetslip: BetActionInterface, originalBetslipSize: number) {
+        const add = 0.01;
+        betslip.newBet!.size = Number(betslip.newBet) + add;
+        if (oppositeBetslip.newBet) {
+            oppositeBetslip.newBet!.size = Number(oppositeBetslip.newBet) * (betslip.newBet!.size / originalBetslipSize);
+        }
+    }
+
+    private hasPendingBetWithSameSize(betslip: BetslipSelectionInterface | null) {
+        return betslip && this.account.currentBets.find(b =>
+            b.offerId === undefined &&
+            Number(b.size) === Math.round(Number(betslip.size)) &&
+            Number(b.price) === Number(betslip.price) * 1000 &&
+            b.side === betslip.side
+        )
     }
 
     private getBetslipSelectionBalancing(
