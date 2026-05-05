@@ -84,6 +84,61 @@ export default class ScrapSocketTask {
         this.isHandlingMarket = false;
     }
 
+    public createWebsocket(browser: Browser, matcher: {
+        [Symbol.match](string: string): RegExpMatchArray | null;
+    }, socketMarketId: number | undefined = undefined): Promise<WebSocket> {
+        return new Promise(async (resolve) => {
+            let done = false;
+            let page: Page | null = null;
+            let loopCount = 0;
+            while (!done) {
+                loopCount++;
+                if (loopCount === 10) {
+                    DiscordService.send("loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
+                }
+                while (!this.orbitxManager.connectedUntil === null) {
+                    await new Promise(resolve2 => setTimeout(resolve2, 1_000));
+                }
+                // region create page
+                if (page !== null) {
+                    await page.close();
+                }
+                let pageCreated = false;
+                while (!pageCreated) {
+                    try {
+                        page = await browser.newPage();
+                        pageCreated = true;
+                    } catch (e) {
+                        await new Promise(resolve2 => setTimeout(resolve2, 1_000));
+                    }
+                }
+                // endregion
+                const cdp = await BrowserManager.addCDPSession(page!);
+                // region register socket handshake
+                cdp!.on('Network.webSocketHandshakeResponseReceived', (event) => {
+                    const r: RegExpMatchArray | null | undefined = event.response.requestHeadersText?.match(matcher);
+                    if (Array.isArray(r) && r.length > 0) {
+                        if (loopCount >= 10) {
+                            DiscordService.send("end loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
+                        }
+                        done = true;
+                        page!.close();
+                        resolve(new WebSocket(r[0], {
+                            headers: event.response.requestHeaders
+                        }));
+                    }
+                });
+                // endregion
+                try {
+                    await page!.goto(OrbitxManager.url);
+                } catch (e: any) {
+                    // nothing
+                }
+                await new Promise(resolve2 => setTimeout(resolve2, OrbitxManager.timeToWaitBeforeWebSocketHandshakeResponseReceived));
+            }
+        })
+    }
+
     private getLogSocketMarketsState() {
         return JSON.stringify({
             socketMarkets: this.orbitxManager.socketMarkets.map((s) => {
@@ -297,61 +352,8 @@ export default class ScrapSocketTask {
         return newSocketMarket;
     }
 
-    private createWebsocket(browser: Browser, socketMarketId: number): Promise<WebSocket> {
-        return new Promise(async (resolve) => {
-            let done = false;
-            let page: Page | null = null;
-            let loopCount = 0;
-            while (!done) {
-                loopCount++;
-                if (loopCount === 10) {
-                    DiscordService.send("loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
-                }
-                while (!this.orbitxManager.connectedUntil === null) {
-                    await new Promise(resolve2 => setTimeout(resolve2, 1_000));
-                }
-                // region create page
-                if (page !== null) {
-                    await page.close();
-                }
-                let pageCreated = false;
-                while (!pageCreated) {
-                    try {
-                        page = await browser.newPage();
-                        pageCreated = true;
-                    } catch (e) {
-                        await new Promise(resolve2 => setTimeout(resolve2, 1_000));
-                    }
-                }
-                // endregion
-                const cdp = await BrowserManager.addCDPSession(page!);
-                // region register socket handshake
-                cdp!.on('Network.webSocketHandshakeResponseReceived', (event) => {
-                    const r: RegExpMatchArray | null | undefined = event.response.requestHeadersText?.match(/wss.*multiple-market-prices.*websocket/);
-                    if (Array.isArray(r) && r.length > 0) {
-                        if (loopCount >= 10) {
-                            DiscordService.send("end loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
-                        }
-                        done = true;
-                        page!.close();
-                        resolve(new WebSocket(r[0], {
-                            headers: event.response.requestHeaders
-                        }));
-                    }
-                });
-                // endregion
-                try {
-                    await page!.goto(OrbitxManager.url);
-                } catch (e: any) {
-                    // nothing
-                }
-                await new Promise(resolve2 => setTimeout(resolve2, OrbitxManager.timeToWaitBeforeWebSocketHandshakeResponseReceived));
-            }
-        })
-    }
-
     private async createWebsocketForSocketMarket(browser: Browser, socketMarket: SocketMarketInterface): Promise<WebSocket> {
-        const websocket = await this.createWebsocket(browser, socketMarket.id);
+        const websocket = await this.createWebsocket(browser, /wss.*multiple-market-prices.*websocket/, socketMarket.id);
         websocket.on('open', () => {
             socketMarket.open = Date.now();
         });

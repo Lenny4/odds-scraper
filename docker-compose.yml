@@ -19,6 +19,8 @@ services:
         published: ${SOCKET_PORT:-4002}
       - target: ${LIVE_PORT:-4004}
         published: ${LIVE_PORT:-4004}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - socket
 

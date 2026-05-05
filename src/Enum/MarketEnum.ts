@@ -18,3 +18,9 @@ export enum OddNameEnum {
     CryptoValue = "cryptoValue",
     PolymarketDerive = "polymarketDerive",
 }
+
+export enum DirectionEnum {
+    Stable = "S",
+    Up = "U",
+    Down = "D",
+}
