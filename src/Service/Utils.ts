@@ -35,7 +35,7 @@ export function getDerive(values: TimeValueInterface[], since: number): number {
     }
     const sequence: number[] = [];
     let i = values.length - 1;
-    while (i >= 0 && (values[i].t >= since || i === values.length - 1)) {
+    while (i >= 0 && (values[i].t >= since || sequence.length < 2)) {
         sequence.push(values[i].v);
         i--;
     }

@@ -47,7 +47,6 @@ export default class BetService {
     private betQueue: GroupMarketInterface[] = [];
     private isBetting: boolean = false;
     private accountWebsocket: WebSocket | null = null;
-    private reconnectAttempts = 0;
     private mappingBackLayLabel = {
         "back": OddTypeEnum.Back,
         "lay": OddTypeEnum.Lay,
@@ -115,7 +114,7 @@ export default class BetService {
         );
         await BrowserManager.release();
         this.accountWebsocket.on('open', () => {
-            this.reconnectAttempts = 0;
+            // console.log("this.accountWebsocket open")
             // this.accountWebsocket!.send(JSON.stringify([JSON.stringify({
             //     "PROPERTIES": {"subscribe": true, "applicationType": "WEB"}
             // })]));
@@ -141,10 +140,9 @@ export default class BetService {
                 message: e.message,
             }));
         });
-        this.accountWebsocket.on('close', () => {
+        this.accountWebsocket.on('close', (code) => {
             const delay = 1000;
-            this.reconnectAttempts++;
-            console.warn(`WebSocket closed. Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`);
+            // console.warn(`WebSocket closed. Reconnecting in ${delay}ms code [${code}]...`);
             setTimeout(() => {
                 this.createAccountWebsocket();
             }, delay);
@@ -155,6 +153,8 @@ export default class BetService {
                 // nothing
             } else if (string.startsWith('h')) {
                 // C’est un ping ou un heartbeat (h pour “heartbeat” souvent), pour maintenir la connexion WebSocket ouverte.
+            } else if (string.startsWith('c')) {
+                // c[1001,""]
             } else if (string.startsWith('a')) {
                 const result: any = JSON.parse(JSON.parse(string.substring(1)));
                 if (result.hasOwnProperty("BALANCE")) {
@@ -272,6 +272,9 @@ export default class BetService {
         const betActions: BetActionsInterface[] = [];
         for (const orbitxMarketRunner of orbitxMarket.marketRunners) {
             const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!;
+            // if (orbitxRunner.id === 40274538) {
+            //     continue;
+            // }
             const polymarketMarketRunner = polymarketMarket.marketRunners.find(mr =>
                 mr.runnerId === orbitxRunner.matchings[PolymarketManager.name].id)!;
 
@@ -406,8 +409,8 @@ export default class BetService {
     }
 
     private getBetConditions(betActions: BetActionsInterface): BetConditionInterface {
-        let layBetLiability = (((Number(betActions.layBetAction.newBet?.price)) / 1000) - 1) * (Number(betActions.layBetAction.newBet?.size));
-        let backBetLiability = Number(betActions.backBetAction.newBet?.size);
+        let layBetLiability = (((Number(betActions.layBetAction.newBet?.price ?? 0)) / 1000) - 1) * (Number(betActions.layBetAction.newBet?.size ?? 0));
+        let backBetLiability = Number(betActions.backBetAction.newBet?.size ?? 0);
         let liability = Math.max(backBetLiability, layBetLiability);
         let totalLiability = liability;
         let balancingLiability = 0;
@@ -524,7 +527,14 @@ export default class BetService {
     ): BetslipSelectionInterface | null {
         const sumBetOdd: SumBetOddInterface = {back: 0, lay: 0};
         for (const bet of bets) {
-            const size = bet.offerId && betsToCancelId.has(bet.offerId) ? Number(bet.sizeMatched) : Number(bet.sizePlaced ?? bet.size);
+            let size = Number(bet.sizePlaced ?? bet.size);
+            if (bet.offerId && betsToCancelId.has(bet.offerId) || bet.offerState === "MATCHED") {
+                size = Number(bet.sizeMatched);
+            } else if (['PLACED'].includes(bet.offerState)) {
+                // todo remove si on tombe jamais dans le else (on peut retirer ce else if et le else du dessous) nothing
+            } else {
+                console.log("unknown bet.offerState", bet)
+            }
             const price = Number(bet.price) * 1000;
             const side = this.mappingBackLayLabel[bet.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
             if (side === OddTypeEnum.Back) {
