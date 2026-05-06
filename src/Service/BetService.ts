@@ -210,7 +210,6 @@ export default class BetService {
             bet.offerId === undefined &&
             bet.side === newBet.side &&
             Number(bet.price) === Number(newBet.price) &&
-            Number(bet.sizePlaced ?? bet.size) === Number(newBet.sizePlaced ?? newBet.size) &&
             bet.selectionId === newBet.selectionId
         )
     }
@@ -288,11 +287,7 @@ export default class BetService {
             const betsToCancelId = new Set([backBetslip, layBetslip].flatMap(b => b.betToCancels.map(bc => bc.offerId))) as Set<number>;
             const betslipBalancing = this.getBetslipSelectionBalancing(
                 orbitxMarket.id,
-                [
-                    ...bets,
-                    backBetslip.newBet,
-                    layBetslip.newBet,
-                ].filter(bet => bet !== null) as GroupBetInterface[],
+                bets,
                 betsToCancelId,
                 backMarketRunnerBetState,
                 layMarketRunnerBetState
@@ -522,7 +517,7 @@ export default class BetService {
 
     private getBetslipSelectionBalancing(
         marketId: MarketInterface['id'],
-        bets: GroupBetInterface[],
+        bets: CurrentBetInterface[],
         betsToCancelId: Set<number>,
         backMarketRunnerBetState: MarketRunnerBetStateInterface,
         layMarketRunnerBetState: MarketRunnerBetStateInterface,
@@ -530,7 +525,7 @@ export default class BetService {
         const sumBetOdd: SumBetOddInterface = {back: 0, lay: 0};
         for (const bet of bets) {
             const size = bet.offerId && betsToCancelId.has(bet.offerId) ? Number(bet.sizeMatched) : Number(bet.sizePlaced ?? bet.size);
-            const price = Number(bet.price);
+            const price = Number(bet.price) * 1000;
             const side = this.mappingBackLayLabel[bet.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
             if (side === OddTypeEnum.Back) {
                 sumBetOdd.back += size * price;
