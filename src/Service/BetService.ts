@@ -92,14 +92,14 @@ export default class BetService {
         }, 1000)
     }
 
-    async bet(groupMarkets: GroupMarketInterface[]) {
+    bet(groupMarkets: GroupMarketInterface[]) {
         this.enqueue(groupMarkets.filter(gm =>
             gm.competition === CompetitionEnum.Nba &&
             gm.markets.length > 1 &&
-            gm.markets.find(m => m.id === "1.257752587")
+            gm.markets.find(m => m.id === "1.257803661")
         ));
         if (this.isBetting) return;
-        await this.processQueue();
+        this.processQueue();
     }
 
     private async createAccountWebsocket(): Promise<void> {
@@ -192,13 +192,14 @@ export default class BetService {
                     b.offerId === undefined &&
                     b.side === newBet.side &&
                     Number(b.price) === Number(newBet.price) &&
-                    Number(b.size) === Number(newBet.size)
+                    Number(b.size) === Number(newBet.size) &&
+                    b.selectionId === newBet.selectionId
                 )
             );
             if (currentBetIndex >= 0) {
-                this.account.currentBets[currentBetIndex] = newBet;
+                this.account.currentBets[currentBetIndex] = newBet as GroupBetInterface;
             } else {
-                this.account.currentBets.push(newBet);
+                this.account.currentBets.push(newBet as GroupBetInterface);
             }
         }
         this.account.currentBets = this.account.currentBets.filter(
@@ -214,16 +215,16 @@ export default class BetService {
         }
     }
 
-    private async processQueue() {
+    private processQueue() {
         this.isBetting = true;
         while (this.betQueue.length > 0) {
             const batch = this.betQueue.splice(0);
-            await this.processBatch(batch);
+            this.processBatch(batch);
         }
         this.isBetting = false;
     }
 
-    private async processBatch(groupMarkets: GroupMarketInterface[]): Promise<void> {
+    private processBatch(groupMarkets: GroupMarketInterface[]) {
         const now = Date.now();
         let betActions: BetActionsInterface[] = [];
         for (const groupMarket of groupMarkets) {
@@ -232,7 +233,10 @@ export default class BetService {
                 this.updateDeriveOddValues(polymarketMarketRunner, now)
             }
             const orbitxMarket = groupMarket.markets.find(m => m.supplier === OrbitxManager.name)!;
-            betActions = [...betActions, ...this.getBetsTodo(groupMarket, this.account.currentBets.filter(b => b.marketId === orbitxMarket.id))];
+            betActions = [...betActions, ...this.getBetsTodo(groupMarket, this.account.currentBets.filter(b =>
+                b.marketId === orbitxMarket.id ||
+                b.betUuid.startsWith(orbitxMarket.id.toString())
+            ))];
         }
         if (betActions.length > 0) {
             const closestToOddValue = 2;
@@ -255,7 +259,7 @@ export default class BetService {
         }
     }
 
-    private getBetsTodo(groupMarket: GroupMarketInterface, bets: CurrentBetInterface[]): BetActionsInterface[] {
+    private getBetsTodo(groupMarket: GroupMarketInterface, bets: GroupBetInterface[]): BetActionsInterface[] {
         const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
         const orbitxMarket = groupMarket.markets.find(m => m.supplier === OrbitxManager.name)!;
         const betActions: BetActionsInterface[] = [];
@@ -285,12 +289,22 @@ export default class BetService {
                 backMarketRunnerBetState,
                 layMarketRunnerBetState
             );
-            betActions.push({
-                backBetAction: backBetslip,
-                balancing: betslipBalancing,
-                layBetAction: layBetslip,
-                marketId: orbitxMarket.id,
-            })
+            if (
+                betslipBalancing !== null ||
+
+                backBetslip.betToCancels.length > 0 ||
+                backBetslip.newBet !== null ||
+
+                layBetslip.betToCancels.length > 0 ||
+                layBetslip.newBet !== null
+            ) {
+                betActions.push({
+                    backBetAction: backBetslip,
+                    balancing: betslipBalancing,
+                    layBetAction: layBetslip,
+                    marketId: orbitxMarket.id,
+                })
+            }
         }
         return betActions;
     }
@@ -306,8 +320,80 @@ export default class BetService {
         if (!betCondition.oddMinMax) {
             return;
         }
-        // todo vérifier si on a la liability pour faire le balancing et les bets sinon faire que les bets
         this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
+        const betslipSelections: BetslipSelectionInterface[] = [];
+        let liability = 0;
+        if (betCondition.totalLiability < this.account.balance) {
+            liability = betCondition.totalLiability;
+            for (const betSlip of [betActions.backBetAction, betActions.layBetAction]) {
+                if (betSlip.newBet !== null) {
+                    betslipSelections.push(betSlip.newBet)
+                }
+                if (betActions.balancing !== null) {
+                    if (betActions.balancing.side === betSlip.newBet?.side) {
+                        betSlip.newBet.size = Number(betSlip.newBet.size) + Number(betActions.balancing.size);
+                    }
+                }
+            }
+        } else if (betCondition.balancingLiability < this.account.balance) {
+            liability = betCondition.balancingLiability;
+            betslipSelections.push({
+                ...this.defaultBetslipSelection,
+                selectionId: Number(betActions.balancing!.selectionId),
+                betUuid: this.getBetUuid(betActions.marketId, betActions.balancing!.selectionId),
+                price: betActions.balancing!.price,
+                size: betActions.balancing!.size,
+                side: betActions.balancing!.side,
+            })
+        }
+        this.placeBets(betActions.marketId, betslipSelections, liability);
+    }
+
+    private placeBets(marketId: MarketInterface['id'], betslipSelections: BetslipSelectionInterface[], liability: number): void {
+        if (betslipSelections.length === 0) {
+            return;
+        }
+        for (const betslipSelection of betslipSelections) {
+            this.account.currentBets.push(betslipSelection as GroupBetInterface);
+        }
+        this.account.balance -= liability;
+        const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
+        console.info("placeBets", betslipSelections.map(b => ({
+            side: b.side,
+            price: b.price,
+            size: b.size,
+        })));
+        fetch("https://www.orbitxch.com/customer/api/placeBets", {
+            headers: orbitxManager.headers,
+            body: JSON.stringify({
+                [marketId]: betslipSelections.map(bs => ({
+                    ...bs,
+                    price: bs.price / 1000,
+                })),
+            }),
+            method: "POST",
+        })
+            .then(res => {
+                if (res.ok) {
+                    return res.json().then(data => {
+                        if (data.status === "OK") {
+                            // nothing, it's done in handleCurrentBets
+                        } else {
+                            console.error("res placeBets", data);
+                            // todo remove from currentBets
+                        }
+                    });
+                } else {
+                    return res.text().then(errorText => {
+                        console.error("res cancelBets", res.status, errorText);
+                        // todo remove from currentBets
+                    });
+                }
+            })
+            .catch(e => {
+                console.error("placeBets but error: ", e);
+                // todo remove from currentBets
+            });
     }
 
     private getBetConditions(betActions: BetActionsInterface): BetConditionInterface {
@@ -329,18 +415,21 @@ export default class BetService {
                 )
             }
         }
-        const minOdd = 1.1;
+        const minOdd = 1.2;
+        // todo replace maxOdd
+        // const maxOdd = minOdd / (minOdd - 1);
+        const maxOdd = 2.5;
         return {
             balancingLiability: Math.ceil(balancingLiability * 100) / 100,
             betLiability: Math.ceil(liability * 100) / 100,
             totalLiability: Math.ceil(totalLiability * 100) / 100,
             oddMinMax:
                 Number(betActions.backBetAction.newBet?.price ?? 0) > (minOdd * 1000) &&
-                Number(betActions.layBetAction.newBet?.price ?? 0) < ((minOdd * 10) * 1000)
+                Number(betActions.layBetAction.newBet?.price ?? 0) < (maxOdd * 1000)
         }
     }
 
-    private async cancelBets(marketId: MarketInterface['id'], betToCancels: CurrentBetInterface[]) {
+    private cancelBets(marketId: MarketInterface['id'], betToCancels: CurrentBetInterface[]): void {
         betToCancels = betToCancels.filter(b => !this.cancellingBets.has(b.offerId as number));
         if (betToCancels.length === 0) {
             return;
@@ -350,38 +439,43 @@ export default class BetService {
             offerIds.push(betToCancel.offerId as number);
             this.cancellingBets.add(betToCancel.offerId as number);
         }
-        try {
-            const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
-            console.log("cancelBets", betToCancels.map(b => {
-                return {
-                    selectionName: b.selectionName,
-                    side: b.side,
-                    price: b.price,
-                    size: b.size,
-                }
-            }))
-            const res = await fetch("https://www.orbitxch.com/customer/api/cancelBets", {
-                headers: orbitxManager.headers,
-                body: JSON.stringify({
-                    [marketId]: betToCancels,
-                }),
-                method: "POST",
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.status === "OK" && data.error === null && data.betDelay === null) {
-                    this.account.currentBets = this.account.currentBets.filter(b => !offerIds.includes(b.offerId as number))
+        const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
+        console.info("cancelBets", betToCancels.map(b => ({
+            selectionName: b.selectionName,
+            side: b.side,
+            price: b.price,
+            size: b.size,
+        })));
+        fetch("https://www.orbitxch.com/customer/api/cancelBets", {
+            headers: orbitxManager.headers,
+            body: JSON.stringify({
+                [marketId]: betToCancels,
+            }),
+            method: "POST",
+        })
+            .then(res => {
+                if (res.ok) {
+                    return res.json().then(data => {
+                        if (data.hasOwnProperty(marketId) && data[marketId].status === "OK") {
+                            this.account.currentBets = this.account.currentBets.filter(b => !offerIds.includes(b.offerId as number));
+                        } else {
+                            console.error("res cancelBets", data);
+                        }
+                    });
                 } else {
-                    console.error("res cancelBets", data);
+                    return res.text().then(errorText => {
+                        console.error("res cancelBets", res.status, errorText);
+                    });
                 }
-            }
-        } catch (e) {
-            console.error("cancelBets but error: ", e);
-        } finally {
-            for (const betToCancel of betToCancels) {
-                this.cancellingBets.delete(betToCancel.offerId as number);
-            }
-        }
+            })
+            .catch(e => {
+                console.error("cancelBets but error: ", e);
+            })
+            .finally(() => {
+                for (const betToCancel of betToCancels) {
+                    this.cancellingBets.delete(betToCancel.offerId as number);
+                }
+            });
     }
 
     private preventBetActionSameSize(backBetslip: BetActionInterface, layBetslip: BetActionInterface) {
@@ -409,7 +503,8 @@ export default class BetService {
             b.offerId === undefined &&
             Number(b.size) === Math.round(Number(betslip.size)) &&
             Number(b.price) === Number(betslip.price) * 1000 &&
-            b.side === betslip.side
+            b.side === betslip.side &&
+            b.selectionId === betslip.selectionId
         )
     }
 
@@ -483,7 +578,7 @@ export default class BetService {
 
     private getBetslips(
         marketId: MarketInterface['id'],
-        bets: CurrentBetInterface[],
+        bets: GroupBetInterface[],
         marketRunnerBetState: MarketRunnerBetStateInterface,
         oppositeMarketRunnerBetState: MarketRunnerBetStateInterface,
         previousSize: number | undefined
@@ -494,7 +589,12 @@ export default class BetService {
         }
         let betFounded = false;
         for (const bet of bets) {
-            if (Number(bet.sizeRemaining) <= 0 || bet.selectionId !== marketRunnerBetState.runnerId) {
+            if (
+                !(
+                    bet.selectionId === marketRunnerBetState.runnerId &&
+                    (Number(bet.sizeRemaining ?? 0) > 0 || typeof bet.betUuid === "string")
+                )
+            ) {
                 continue;
             }
             const side = this.mappingBackLayLabel[bet.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
@@ -502,7 +602,10 @@ export default class BetService {
                 continue;
             }
             if (oppositeMarketRunnerBetState.oddValue) {
-                const betOddValue = Number(bet.price) * 1000;
+                let betOddValue = Number(bet.price);
+                if (Number(bet.sizeRemaining ?? 0) > 0) {
+                    betOddValue = betOddValue * 1000;
+                }
                 const betMarket = this.getBetMarket(
                     marketRunnerBetState.type,
                     betOddValue,

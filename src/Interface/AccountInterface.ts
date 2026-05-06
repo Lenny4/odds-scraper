@@ -5,7 +5,7 @@ import {MarketInterface, RunnerInterface} from "./MarketInterface";
 
 export interface AccountInterface {
     balance: number;
-    currentBets: CurrentBetInterface[];
+    currentBets: GroupBetInterface[];
 }
 
 export interface BalanceResponseInterface {
