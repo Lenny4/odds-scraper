@@ -166,10 +166,10 @@ export default class BetService {
                     DiscordService.send(string)
                 }
             } else {
+                this.accountWebsocket?.close();
                 const message = 'Unknown message type websocket: ' + string;
                 console.error(message);
                 DiscordService.send(message)
-                throw message;
             }
         });
     }
@@ -186,15 +186,12 @@ export default class BetService {
         }
         const offerIds = new Set(data.CURRENT_BETS.map(b => b.offerId));
         for (const newBet of data.CURRENT_BETS) {
+            if (newBet.offerState === "CANCELLED" && Number(newBet.sizeMatched) === 0) {
+                continue;
+            }
             const currentBetIndex = this.account.currentBets.findIndex(b =>
                 b.offerId === newBet.offerId ||
-                (
-                    b.offerId === undefined &&
-                    b.side === newBet.side &&
-                    Number(b.price) === Number(newBet.price) &&
-                    Number(b.size) === Number(newBet.size) &&
-                    b.selectionId === newBet.selectionId
-                )
+                this.isSameBet(newBet as GroupBetInterface, b)
             );
             if (currentBetIndex >= 0) {
                 this.account.currentBets[currentBetIndex] = newBet as GroupBetInterface;
@@ -202,9 +199,20 @@ export default class BetService {
                 this.account.currentBets.push(newBet as GroupBetInterface);
             }
         }
+        // todo ça arrive que !offerIds.has(b.offerId) ?
         this.account.currentBets = this.account.currentBets.filter(
             b => b.offerId === undefined || offerIds.has(b.offerId)
         );
+    }
+
+    private isSameBet(newBet: GroupBetInterface, bet: GroupBetInterface) {
+        return (
+            bet.offerId === undefined &&
+            bet.side === newBet.side &&
+            Number(bet.price) === Number(newBet.price) &&
+            Number(bet.sizePlaced ?? bet.size) === Number(newBet.sizePlaced ?? newBet.size) &&
+            bet.selectionId === newBet.selectionId
+        )
     }
 
     private enqueue(groupMarkets: GroupMarketInterface[]) {
@@ -354,10 +362,19 @@ export default class BetService {
             return;
         }
         for (const betslipSelection of betslipSelections) {
+            betslipSelection.price = betslipSelection.price / 1000;
+            betslipSelection.size = this.roundSize(betslipSelection.size);
             this.account.currentBets.push(betslipSelection as GroupBetInterface);
         }
         this.account.balance -= liability;
         const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
+        const cleanup = () => {
+            this.account.currentBets = this.account.currentBets.filter(
+                b => !betslipSelections.some(
+                    betslipSelection => this.isSameBet(betslipSelection as GroupBetInterface, b)
+                )
+            );
+        };
         console.info("placeBets", betslipSelections.map(b => ({
             side: b.side,
             price: b.price,
@@ -366,33 +383,30 @@ export default class BetService {
         fetch("https://www.orbitxch.com/customer/api/placeBets", {
             headers: orbitxManager.headers,
             body: JSON.stringify({
-                [marketId]: betslipSelections.map(bs => ({
-                    ...bs,
-                    price: bs.price / 1000,
-                })),
+                [marketId]: betslipSelections,
             }),
             method: "POST",
         })
             .then(res => {
                 if (res.ok) {
                     return res.json().then(data => {
-                        if (data.status === "OK") {
+                        if (data.hasOwnProperty(marketId) && data[marketId].status === "OK") {
                             // nothing, it's done in handleCurrentBets
                         } else {
                             console.error("res placeBets", data);
-                            // todo remove from currentBets
+                            cleanup();
                         }
                     });
                 } else {
                     return res.text().then(errorText => {
                         console.error("res cancelBets", res.status, errorText);
-                        // todo remove from currentBets
+                        cleanup();
                     });
                 }
             })
             .catch(e => {
                 console.error("placeBets but error: ", e);
-                // todo remove from currentBets
+                cleanup();
             });
     }
 
@@ -444,7 +458,7 @@ export default class BetService {
             selectionName: b.selectionName,
             side: b.side,
             price: b.price,
-            size: b.size,
+            size: b.sizePlaced ?? b.size,
         })));
         fetch("https://www.orbitxch.com/customer/api/cancelBets", {
             headers: orbitxManager.headers,
@@ -498,14 +512,12 @@ export default class BetService {
         }
     }
 
+    private roundSize(size: number | string) {
+        return Math.round(Number(size) * 100) / 100;
+    }
+
     private hasPendingBetWithSameSize(betslip: BetslipSelectionInterface | null) {
-        return betslip && this.account.currentBets.find(b =>
-            b.offerId === undefined &&
-            Number(b.size) === Math.round(Number(betslip.size)) &&
-            Number(b.price) === Number(betslip.price) * 1000 &&
-            b.side === betslip.side &&
-            b.selectionId === betslip.selectionId
-        )
+        return betslip && this.account.currentBets.find(b => this.isSameBet(betslip as GroupBetInterface, b))
     }
 
     private getBetslipSelectionBalancing(
@@ -517,7 +529,7 @@ export default class BetService {
     ): BetslipSelectionInterface | null {
         const sumBetOdd: SumBetOddInterface = {back: 0, lay: 0};
         for (const bet of bets) {
-            const size = bet.offerId && betsToCancelId.has(bet.offerId) ? Number(bet.sizeMatched) : Number(bet.size);
+            const size = bet.offerId && betsToCancelId.has(bet.offerId) ? Number(bet.sizeMatched) : Number(bet.sizePlaced ?? bet.size);
             const price = Number(bet.price);
             const side = this.mappingBackLayLabel[bet.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
             if (side === OddTypeEnum.Back) {
@@ -602,17 +614,14 @@ export default class BetService {
                 continue;
             }
             if (oppositeMarketRunnerBetState.oddValue) {
-                let betOddValue = Number(bet.price);
-                if (Number(bet.sizeRemaining ?? 0) > 0) {
-                    betOddValue = betOddValue * 1000;
-                }
+                const betOddValue = Number(bet.price) * 1000;
                 const betMarket = this.getBetMarket(
                     marketRunnerBetState.type,
                     betOddValue,
                     oppositeMarketRunnerBetState.oddValue,
                     marketRunnerBetState.direction,
                 );
-                if (betMarket.isBeyondMarket || (betMarket.isAtMarket && betMarket.isMovingAgainstBet)) {
+                if (bet.offerId && (betMarket.isBeyondMarket || (betMarket.isAtMarket && betMarket.isMovingAgainstBet))) {
                     betAction.betToCancels.push(bet);
                 } else if (betMarket.isAtMarket) {
                     betFounded = true;
@@ -701,9 +710,9 @@ export default class BetService {
                 }
                 const side = this.mappingBackLayLabel[bet.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
                 if (side === OddTypeEnum.Back) {
-                    totalPnl += isWinner ? Number(bet.size) * (bet.price - 1) : -bet.size;
+                    totalPnl += isWinner ? Number(bet.sizePlaced ?? bet.size) * (bet.price - 1) : Number(bet.sizePlaced ? bet.sizePlaced : -bet.size);
                 } else if (side === OddTypeEnum.Lay) {
-                    totalPnl += isWinner ? -Number(bet.size) * (bet.price - 1) : Number(bet.size);
+                    totalPnl += isWinner ? -Number(bet.sizePlaced ?? bet.size) * (bet.price - 1) : Number(bet.sizePlaced ?? bet.size);
                 } else {
                     throw `unknown side getPriceBySelection: ${bet.side}`;
                 }
