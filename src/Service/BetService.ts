@@ -93,9 +93,9 @@ export default class BetService {
 
     bet(groupMarkets: GroupMarketInterface[]) {
         this.enqueue(groupMarkets.filter(gm =>
+            // gm.markets.find(m => m.id === "1.257846509") &&
             gm.competition === CompetitionEnum.Nba &&
-            gm.markets.length > 1 &&
-            gm.markets.find(m => m.id === "1.257803661")
+            gm.markets.length > 1
         ));
         if (this.isBetting) return;
         this.processQueue();
@@ -272,7 +272,7 @@ export default class BetService {
         const betActions: BetActionsInterface[] = [];
         for (const orbitxMarketRunner of orbitxMarket.marketRunners) {
             const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!;
-            // if (orbitxRunner.id === 40274538) {
+            // if (orbitxRunner.id === 5368712) {
             //     continue;
             // }
             const polymarketMarketRunner = polymarketMarket.marketRunners.find(mr =>
@@ -323,13 +323,9 @@ export default class BetService {
             return;
         }
         const betCondition = this.getBetConditions(betActions);
-        if (!betCondition.oddMinMax) {
-            return;
-        }
-        this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
         const betslipSelections: BetslipSelectionInterface[] = [];
         let liability = 0;
-        if (betCondition.totalLiability < this.account.balance) {
+        if (betCondition.oddMinMax && betCondition.totalLiability < this.account.balance) {
             liability = betCondition.totalLiability;
             for (const betSlip of [betActions.backBetAction, betActions.layBetAction]) {
                 if (betSlip.newBet !== null) {
@@ -341,16 +337,24 @@ export default class BetService {
                     }
                 }
             }
-        } else if (betCondition.balancingLiability < this.account.balance) {
+            this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
+        } else if (
+            betActions.balancing !== null &&
+            betCondition.balancingLiability < this.account.balance
+        ) {
             liability = betCondition.balancingLiability;
-            betslipSelections.push({
+            const balancingBetslipSelection: BetslipSelectionInterface = {
                 ...this.defaultBetslipSelection,
                 selectionId: Number(betActions.balancing!.selectionId),
                 betUuid: this.getBetUuid(betActions.marketId, betActions.balancing!.selectionId),
                 price: betActions.balancing!.price,
                 size: betActions.balancing!.size,
                 side: betActions.balancing!.side,
-            })
+            }
+            betslipSelections.push(balancingBetslipSelection);
+            while (this.hasPendingBetWithSameSize(balancingBetslipSelection)) {
+                balancingBetslipSelection.size = Number(balancingBetslipSelection.size) + BetService.MIN_SIZE;
+            }
         }
         this.placeBets(betActions.marketId, betslipSelections, liability);
     }
@@ -378,11 +382,12 @@ export default class BetService {
             price: b.price,
             size: b.size,
         })));
+        const body = {
+            [marketId]: betslipSelections,
+        };
         fetch("https://www.orbitxch.com/customer/api/placeBets", {
             headers: orbitxManager.headers,
-            body: JSON.stringify({
-                [marketId]: betslipSelections,
-            }),
+            body: JSON.stringify(body),
             method: "POST",
         })
             .then(res => {
@@ -397,7 +402,7 @@ export default class BetService {
                     });
                 } else {
                     return res.text().then(errorText => {
-                        console.error("res cancelBets", res.status, errorText);
+                        console.error("res placeBets", res.status, errorText, body);
                         cleanup();
                     });
                 }
@@ -427,18 +432,26 @@ export default class BetService {
                 )
             }
         }
-        const minOdd = 1.2;
-        // todo replace maxOdd
-        // const maxOdd = minOdd / (minOdd - 1);
-        const maxOdd = 2.5;
         return {
             balancingLiability: Math.ceil(balancingLiability * 100) / 100,
             betLiability: Math.ceil(liability * 100) / 100,
             totalLiability: Math.ceil(totalLiability * 100) / 100,
-            oddMinMax:
-                Number(betActions.backBetAction.newBet?.price ?? 0) > (minOdd * 1000) &&
-                Number(betActions.layBetAction.newBet?.price ?? 0) < (maxOdd * 1000)
+            oddMinMax: this.isValidOddMinMax(betActions.backBetAction) && this.isValidOddMinMax(betActions.layBetAction),
         }
+    }
+
+    private isValidOddMinMax(betAction: BetActionInterface) {
+        const minOdd = 1.05;
+        // todo replace maxOdd
+        // const maxOdd = minOdd / (minOdd - 1);
+        const maxOdd = 2.5;
+        return (
+            betAction.newBet === null ||
+            (
+                Number(betAction.newBet?.price ?? 0) >= (minOdd * 1000) &&
+                Number(betAction.newBet?.price ?? 0) <= (maxOdd * 1000)
+            )
+        )
     }
 
     private cancelBets(marketId: MarketInterface['id'], betToCancels: CurrentBetInterface[]): void {
@@ -458,11 +471,12 @@ export default class BetService {
             price: b.price,
             size: b.sizePlaced ?? b.size,
         })));
+        const body = {
+            [marketId]: betToCancels,
+        };
         fetch("https://www.orbitxch.com/customer/api/cancelBets", {
             headers: orbitxManager.headers,
-            body: JSON.stringify({
-                [marketId]: betToCancels,
-            }),
+            body: JSON.stringify(body),
             method: "POST",
         })
             .then(res => {
@@ -476,7 +490,7 @@ export default class BetService {
                     });
                 } else {
                     return res.text().then(errorText => {
-                        console.error("res cancelBets", res.status, errorText);
+                        console.error("res cancelBets", res.status, errorText, body);
                     });
                 }
             })
@@ -520,7 +534,7 @@ export default class BetService {
 
     private getBetslipSelectionBalancing(
         marketId: MarketInterface['id'],
-        bets: CurrentBetInterface[],
+        bets: GroupBetInterface[],
         betsToCancelId: Set<number>,
         backMarketRunnerBetState: MarketRunnerBetStateInterface,
         layMarketRunnerBetState: MarketRunnerBetStateInterface,
@@ -528,7 +542,11 @@ export default class BetService {
         const sumBetOdd: SumBetOddInterface = {back: 0, lay: 0};
         for (const bet of bets) {
             let size = Number(bet.sizePlaced ?? bet.size);
-            if (bet.offerId && betsToCancelId.has(bet.offerId) || bet.offerState === "MATCHED") {
+            if (
+                bet.offerId === undefined ||
+                betsToCancelId.has(bet.offerId) ||
+                ["MATCHED", "LAPSED"].includes(bet.offerState)
+            ) {
                 size = Number(bet.sizeMatched);
             } else if (['PLACED'].includes(bet.offerState)) {
                 // todo remove si on tombe jamais dans le else (on peut retirer ce else if et le else du dessous) nothing
@@ -605,6 +623,7 @@ export default class BetService {
             newBet: null,
         }
         let betFounded = false;
+        let betMarket: BetMarketInterface | null = null;
         for (const bet of bets) {
             if (
                 !(
@@ -618,18 +637,21 @@ export default class BetService {
             if (side !== marketRunnerBetState.type) {
                 continue;
             }
+            betFounded = true;
             if (oppositeMarketRunnerBetState.oddValue) {
                 const betOddValue = Number(bet.price) * 1000;
-                const betMarket = this.getBetMarket(
+                betMarket = this.getBetMarket(
                     marketRunnerBetState.type,
                     betOddValue,
                     oppositeMarketRunnerBetState.oddValue,
                     marketRunnerBetState.direction,
                 );
-                if (bet.offerId && (betMarket.isBeyondMarket || (betMarket.isAtMarket && betMarket.isMovingAgainstBet))) {
+                if (
+                    bet.offerId &&
+                    bet.offerState === "PLACED" &&
+                    (betMarket.isBeyondMarket || betMarket.isMovingAgainstBet)
+                ) {
                     betAction.betToCancels.push(bet);
-                } else if (betMarket.isAtMarket) {
-                    betFounded = true;
                 }
             }
         }
@@ -638,13 +660,21 @@ export default class BetService {
             if (previousSize) {
                 size = (marketRunnerBetState.oddValue! / oppositeMarketRunnerBetState.oddValue!) * previousSize;
             }
-            betAction.newBet = {
-                ...this.defaultBetslipSelection,
-                selectionId: Number(marketRunnerBetState.runnerId),
-                betUuid: this.getBetUuid(marketId, marketRunnerBetState.runnerId),
-                price: oppositeMarketRunnerBetState.oddValue!,
-                size: size,
-                side: this.reverseMappingBackLayLabel[marketRunnerBetState.type].toUpperCase(),
+            betMarket ??= this.getBetMarket(
+                marketRunnerBetState.type,
+                marketRunnerBetState.oddValue!,
+                oppositeMarketRunnerBetState.oddValue!,
+                marketRunnerBetState.direction,
+            );
+            if (!betMarket.isMovingAgainstBet) {
+                betAction.newBet = {
+                    ...this.defaultBetslipSelection,
+                    selectionId: Number(marketRunnerBetState.runnerId),
+                    betUuid: this.getBetUuid(marketId, marketRunnerBetState.runnerId),
+                    price: oppositeMarketRunnerBetState.oddValue!,
+                    size: size,
+                    side: this.reverseMappingBackLayLabel[marketRunnerBetState.type].toUpperCase(),
+                }
             }
         }
         return betAction;
