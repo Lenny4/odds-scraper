@@ -93,7 +93,7 @@ export default class BetService {
 
     bet(groupMarkets: GroupMarketInterface[]) {
         this.enqueue(groupMarkets.filter(gm =>
-            // gm.markets.find(m => m.id === "1.257846509") &&
+            gm.markets.find(m => m.id === "1.257965528") &&
             gm.competition === CompetitionEnum.Nba &&
             gm.markets.length > 1
         ));
@@ -186,9 +186,6 @@ export default class BetService {
         }
         const offerIds = new Set(data.CURRENT_BETS.map(b => b.offerId));
         for (const newBet of data.CURRENT_BETS) {
-            if (newBet.offerState === "CANCELLED" && Number(newBet.sizeMatched) === 0) {
-                continue;
-            }
             const currentBetIndex = this.account.currentBets.findIndex(b =>
                 b.offerId === newBet.offerId ||
                 this.isSameBet(newBet as GroupBetInterface, b)
@@ -272,9 +269,9 @@ export default class BetService {
         const betActions: BetActionsInterface[] = [];
         for (const orbitxMarketRunner of orbitxMarket.marketRunners) {
             const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!;
-            // if (orbitxRunner.id === 5368712) {
-            //     continue;
-            // }
+            if (orbitxRunner.id !== 237471) {
+                continue;
+            }
             const polymarketMarketRunner = polymarketMarket.marketRunners.find(mr =>
                 mr.runnerId === orbitxRunner.matchings[PolymarketManager.name].id)!;
 
@@ -327,15 +324,20 @@ export default class BetService {
         let liability = 0;
         if (betCondition.oddMinMax && betCondition.totalLiability < this.account.balance) {
             liability = betCondition.totalLiability;
+            let foundBet = false;
             for (const betSlip of [betActions.backBetAction, betActions.layBetAction]) {
                 if (betSlip.newBet !== null) {
                     betslipSelections.push(betSlip.newBet)
                 }
                 if (betActions.balancing !== null) {
                     if (betActions.balancing.side === betSlip.newBet?.side) {
+                        foundBet = true;
                         betSlip.newBet.size = Number(betSlip.newBet.size) + Number(betActions.balancing.size);
                     }
                 }
+            }
+            if (betActions.balancing !== null && !foundBet) {
+                betslipSelections.push(betActions.balancing)
             }
             this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
         } else if (
@@ -360,6 +362,7 @@ export default class BetService {
     }
 
     private placeBets(marketId: MarketInterface['id'], betslipSelections: BetslipSelectionInterface[], liability: number): void {
+        betslipSelections = betslipSelections.filter(bs => Number(bs.size) >= BetService.MIN_BET_AMOUNT);
         if (betslipSelections.length === 0) {
             return;
         }
@@ -396,7 +399,7 @@ export default class BetService {
                         if (data.hasOwnProperty(marketId) && data[marketId].status === "OK") {
                             // nothing, it's done in handleCurrentBets
                         } else {
-                            console.error("res placeBets", data);
+                            console.error("res placeBets", data, body);
                             cleanup();
                         }
                     });
@@ -466,6 +469,7 @@ export default class BetService {
         }
         const orbitxManager = this.app.supplierManagers.find(s => s.name === OrbitxManager.name) as OrbitxManager;
         console.info("cancelBets", betToCancels.map(b => ({
+            selectionId: b.selectionId,
             selectionName: b.selectionName,
             side: b.side,
             price: b.price,
@@ -483,14 +487,19 @@ export default class BetService {
                 if (res.ok) {
                     return res.json().then(data => {
                         if (data.hasOwnProperty(marketId) && data[marketId].status === "OK") {
-                            this.account.currentBets = this.account.currentBets.filter(b => !offerIds.includes(b.offerId as number));
+                            for (const bet of this.account.currentBets) {
+                                if (offerIds.includes(bet.offerId as number)) {
+                                    bet.offerState = "CANCELLED";
+                                }
+                            }
                         } else {
                             console.error("res cancelBets", data);
                         }
                     });
                 } else {
                     return res.text().then(errorText => {
-                        console.error("res cancelBets", res.status, errorText, body);
+                        console.error("res cancelBets", res.status, errorText, body, this.account.currentBets);
+                        const test = 0;
                     });
                 }
             })
@@ -545,13 +554,13 @@ export default class BetService {
             if (
                 bet.offerId === undefined ||
                 betsToCancelId.has(bet.offerId) ||
-                ["MATCHED", "LAPSED"].includes(bet.offerState)
+                ["MATCHED", "LAPSED", "CANCELLED"].includes(bet.offerState)
             ) {
                 size = Number(bet.sizeMatched);
             } else if (['PLACED'].includes(bet.offerState)) {
                 // todo remove si on tombe jamais dans le else (on peut retirer ce else if et le else du dessous) nothing
             } else {
-                console.log("unknown bet.offerState", bet)
+                console.error("unknown bet.offerState", bet)
             }
             const price = Number(bet.price) * 1000;
             const side = this.mappingBackLayLabel[bet.side.toLowerCase() as keyof typeof this.mappingBackLayLabel];
