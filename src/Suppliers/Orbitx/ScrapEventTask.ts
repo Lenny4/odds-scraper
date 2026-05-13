@@ -32,6 +32,7 @@ export default class ScrapEventTask {
             for (const sport of this.orbitxManager.sports) {
                 await this.scrapSport(sport.id, timeoutBetweenPage);
             }
+            this.orbitxManager.app.allMarketScraped = true;
             timeoutBetweenPage = 5_000;
         }
     }

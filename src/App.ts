@@ -18,6 +18,7 @@ export default class App {
     betService: BetService;
     dashboard: Dashboard;
     groupMarketId: number = 0;
+    allMarketScraped: boolean = false;
     groupMarkets: GroupMarketInterface[] = [];
     competitionMapping: CompetitionMappingInterface[] = [
         {
@@ -43,7 +44,7 @@ export default class App {
         this.mongoService = new MongoService(this);
         this.supplierManagers = [
             new OrbitxManager(this),
-            new PolymarketManager(this),
+            // new PolymarketManager(this),
             // new PolymarketBitcoinManager(this),
         ]
         this.dashboard = new Dashboard(this);

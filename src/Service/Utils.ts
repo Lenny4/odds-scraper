@@ -3,6 +3,37 @@
 import {MarketInterface, OddInterface, TimeValueInterface} from "../Interface/MarketInterface";
 import {MarketMessageInterface, OddRequestInterface} from "../Interface/LiveInterface";
 
+export const ticks = [
+    {from: 0.00, to: 2.00, tick: 0.01},
+    {from: 2.00, to: 3.00, tick: 0.02},
+    {from: 3.00, to: 4.00, tick: 0.05},
+    {from: 4.00, to: 6.0, tick: 0.1},
+    {from: 6.0, to: 10.0, tick: 0.2},
+    {from: 10.0, to: 20.0, tick: 0.5},
+    {from: 20.0, to: 30.0, tick: 1.0},
+    {from: 30.0, to: 50.0, tick: 2.0},
+    {from: 50.0, to: 100.0, tick: 5.0},
+    {from: 100.0, to: 1000.0, tick: 10.0}
+];
+
+export const getTickSize = (oddValue: number): number => {
+    for (const range of ticks) {
+        if (oddValue > range.from && oddValue <= range.to) {
+            return range.tick;
+        }
+    }
+    return 10; // hors plage connue
+}
+
+export const getTickDiff = (min: number, max: number): number => {
+    let result = 0;
+    while (min < max) {
+        result++;
+        min += getTickSize(min);
+    }
+    return result;
+}
+
 export function getValueByPath(obj: any, path: string): any {
     const tokens = path.replace(/\[(\d+)\]/g, '.$1').split('.');
     return tokens.reduce((current, token) => current?.[token], obj);

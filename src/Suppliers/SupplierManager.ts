@@ -253,7 +253,7 @@ export abstract class SupplierManager {
         const now = Date.now();
         const liveCompetitions = (market.event.competition.enum !== null && this.app.liveCompetitions.includes(market.event.competition.enum));
         return (
-            market.event.competition.enum !== null &&
+            // market.event.competition.enum !== null &&
             !this.getMarketIsFinish(market) &&
             (
                 (
