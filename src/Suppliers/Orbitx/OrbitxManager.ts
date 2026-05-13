@@ -20,30 +20,30 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     socketMarkets: SocketMarketInterface[] = [];
     running: boolean = false;
     readonly sports: SportInterface[] = [
-        // {
-        //     id: "1",
-        //     enum: SportEnum.Soccer
-        // },
-        // {
-        //     id: "2",
-        //     enum: SportEnum.Tennis
-        // },
-        // {
-        //     id: "4",
-        //     enum: SportEnum.Cricket
-        // },
-        // {
-        //     id: "7511",
-        //     enum: SportEnum.Baseball,
-        // },
+        {
+            id: "1",
+            enum: SportEnum.Soccer
+        },
+        {
+            id: "2",
+            enum: SportEnum.Tennis
+        },
+        {
+            id: "4",
+            enum: SportEnum.Cricket
+        },
+        {
+            id: "7511",
+            enum: SportEnum.Baseball,
+        },
         {
             id: "7522",
             enum: SportEnum.Basketball,
         },
-        // {
-        //     id: "61420",
-        //     enum: SportEnum.AustralianRules,
-        // },
+        {
+            id: "61420",
+            enum: SportEnum.AustralianRules,
+        },
     ];
 
     scrapEventTask: ScrapEventTask | null = null;

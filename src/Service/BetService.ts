@@ -34,7 +34,7 @@ import {
 
 export default class BetService {
     static readonly MIN_BET_AMOUNT = 7;
-    static readonly DEFAULT_BET_AMOUNT = BetService.MIN_BET_AMOUNT;
+    static readonly DEFAULT_BET_AMOUNT = 7.50;
     static readonly MIN_SIZE = 0.01;
     private static readonly DERIVE_WINDOW_MS = 10_000;
     app: App;
@@ -93,7 +93,7 @@ export default class BetService {
 
     bet(groupMarkets: GroupMarketInterface[]) {
         this.enqueue(groupMarkets.filter(gm =>
-            gm.markets.find(m => m.id === "1.257965528") &&
+            // gm.markets.find(m => m.id === "1.257965528") &&
             gm.competition === CompetitionEnum.Nba &&
             gm.markets.length > 1
         ));
@@ -251,6 +251,12 @@ export default class BetService {
                 if (a.balancing === null && b.balancing !== null) {
                     return 1;
                 }
+                if (a.nbVolumeChanges !== b.nbVolumeChanges) {
+                    return b.nbVolumeChanges - a.nbVolumeChanges;
+                }
+                if (a.diffOddValue !== b.diffOddValue) {
+                    return b.nbVolumeChanges - a.nbVolumeChanges;
+                }
                 const aOddValues = [a.backBetAction.newBet?.price ?? 0, a.layBetAction.newBet?.price ?? 0]
                 const bOddValues = [b.backBetAction.newBet?.price ?? 0, b.layBetAction.newBet?.price ?? 0]
                 const aAvg = aOddValues.reduce((sum, num) => sum + num, 0) / aOddValues.length;
@@ -264,14 +270,15 @@ export default class BetService {
     }
 
     private getBetsTodo(groupMarket: GroupMarketInterface, bets: GroupBetInterface[]): BetActionsInterface[] {
+        const now = Date.now();
         const polymarketMarket = groupMarket.markets.find(m => m.supplier === PolymarketManager.name)!;
         const orbitxMarket = groupMarket.markets.find(m => m.supplier === OrbitxManager.name)!;
         const betActions: BetActionsInterface[] = [];
         for (const orbitxMarketRunner of orbitxMarket.marketRunners) {
             const orbitxRunner = orbitxMarket.runners.find(r => r.id === orbitxMarketRunner.runnerId)!;
-            if (orbitxRunner.id !== 237471) {
-                continue;
-            }
+            // if (orbitxRunner.id !== 237471) {
+            //     continue;
+            // }
             const polymarketMarketRunner = polymarketMarket.marketRunners.find(mr =>
                 mr.runnerId === orbitxRunner.matchings[PolymarketManager.name].id)!;
 
@@ -306,6 +313,13 @@ export default class BetService {
                     balancing: betslipBalancing,
                     layBetAction: layBetslip,
                     marketId: orbitxMarket.id,
+                    nbVolumeChanges: orbitxMarket.odds
+                        .find(o => o.name === OddNameEnum.MarketVolume)?.values
+                        .filter(v => v.t >= now - (60 * 1000)).length ?? 0,
+                    diffOddValue: (backBetslip.newBet !== null && layBetslip.newBet !== null) ? (
+                        layBetslip.newBet.price / backBetslip.newBet.price
+                    ) : 0,
+                    isLive: orbitxMarket.startTime !== null,
                 })
             }
         }
@@ -322,7 +336,26 @@ export default class BetService {
         const betCondition = this.getBetConditions(betActions);
         const betslipSelections: BetslipSelectionInterface[] = [];
         let liability = 0;
-        if (betCondition.oddMinMax && betCondition.totalLiability < this.account.balance) {
+        if (
+            betActions.balancing !== null &&
+            Number(betActions.balancing.size) >= BetService.MIN_BET_AMOUNT &&
+            !betActions.isLive &&
+            betCondition.balancingLiability < this.account.balance
+        ) {
+            liability = betCondition.balancingLiability;
+            const balancingBetslipSelection: BetslipSelectionInterface = {
+                ...this.defaultBetslipSelection,
+                selectionId: Number(betActions.balancing!.selectionId),
+                betUuid: this.getBetUuid(betActions.marketId, betActions.balancing!.selectionId),
+                price: betActions.balancing!.price,
+                size: betActions.balancing!.size,
+                side: betActions.balancing!.side,
+            }
+            betslipSelections.push(balancingBetslipSelection);
+            while (this.hasPendingBetWithSameSize(balancingBetslipSelection)) {
+                balancingBetslipSelection.size = Number(balancingBetslipSelection.size) + BetService.MIN_SIZE;
+            }
+        } else if (betCondition.oddMinMax && betCondition.totalLiability < this.account.balance) {
             liability = betCondition.totalLiability;
             let foundBet = false;
             for (const betSlip of [betActions.backBetAction, betActions.layBetAction]) {
@@ -340,23 +373,6 @@ export default class BetService {
                 betslipSelections.push(betActions.balancing)
             }
             this.preventBetActionSameSize(betActions.backBetAction, betActions.layBetAction);
-        } else if (
-            betActions.balancing !== null &&
-            betCondition.balancingLiability < this.account.balance
-        ) {
-            liability = betCondition.balancingLiability;
-            const balancingBetslipSelection: BetslipSelectionInterface = {
-                ...this.defaultBetslipSelection,
-                selectionId: Number(betActions.balancing!.selectionId),
-                betUuid: this.getBetUuid(betActions.marketId, betActions.balancing!.selectionId),
-                price: betActions.balancing!.price,
-                size: betActions.balancing!.size,
-                side: betActions.balancing!.side,
-            }
-            betslipSelections.push(balancingBetslipSelection);
-            while (this.hasPendingBetWithSameSize(balancingBetslipSelection)) {
-                balancingBetslipSelection.size = Number(balancingBetslipSelection.size) + BetService.MIN_SIZE;
-            }
         }
         this.placeBets(betActions.marketId, betslipSelections, liability);
     }

@@ -63,6 +63,9 @@ export interface BetActionsInterface {
     layBetAction: BetActionInterface,
     balancing: BetslipSelectionInterface | null,
     marketId: MarketInterface['id'],
+    nbVolumeChanges: number,
+    diffOddValue: number,
+    isLive: boolean,
 }
 
 export interface BetConditionInterface {
