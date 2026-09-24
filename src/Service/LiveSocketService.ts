@@ -14,8 +14,6 @@ import {GroupMarketInterface, MarketInterface, OddInterface} from "../Interface/
 import {getOddsForOddRequest} from "./Utils";
 import {OddNameEnum} from "../Enum/MarketEnum";
 
-const clone = require('clone');
-
 export default class LiveSocketService {
     public app: App;
     private io?: Server;
@@ -155,7 +153,7 @@ export default class LiveSocketService {
                 odds = getOddsForOddRequest(market, oddRequest);
                 if (oddRequest.i !== undefined) {
                     for (const [index, odd] of odds.entries()) {
-                        odds[index] = clone(odd);
+                        odds[index] = structuredClone(odd);
                         odds[index].values = odd.values.filter(o => o.i >= oddRequest.i!)
                     }
                 }
