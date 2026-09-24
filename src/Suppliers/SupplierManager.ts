@@ -163,6 +163,7 @@ export abstract class SupplierManager {
 
     groupMarketAddMarket(groupMarket: GroupMarketInterface, newMarket: MarketInterface) {
         groupMarket.markets.push(newMarket);
+        this.app.indexGroupMarket(newMarket, groupMarket);
         groupMarket.startTime = groupMarket.markets.reduce((sum, m) => sum + m.startTime, 0) / groupMarket.markets.length;
         if (groupMarket.markets.length > 1) {
             for (const market of groupMarket.markets) {
@@ -236,15 +237,27 @@ export abstract class SupplierManager {
         const groupMarkets: GroupMarketInterface[] = [];
         for (const removeMarket of marketsToRemove) {
             const groupMarket = this.app.getGroupMarket(removeMarket.id, removeMarket.supplier);
-            groupMarkets.push(groupMarket);
+            if (!groupMarket) {
+                console.error("Market without groupMarket removed", this.marketToString(removeMarket));
+                this.markets = this.markets.filter(m => m.id !== removeMarket.id);
+                continue;
+            }
+            if (groupMarkets.includes(groupMarket)) {
+                continue;
+            }
             if (save !== false) {
-                await this.app.mongoService!.saveGroupMarket(groupMarket, time);
+                if (!(await this.app.mongoService.saveGroupMarket(groupMarket, time))) {
+                    // keep it in memory, it will be saved on the next removeMarkets call
+                    removeMarket.isSaving = false;
+                    continue;
+                }
                 if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
                     console.info("Market added in Mongo and removed from this.markets", this.marketToString(groupMarket.markets[0]));
                 }
             } else if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
                 console.info("Market removed from this.markets", this.marketToString(groupMarket.markets[0]));
             }
+            groupMarkets.push(groupMarket);
         }
         this.removeGroupMarkets(groupMarkets);
     }
@@ -359,6 +372,7 @@ export abstract class SupplierManager {
             for (const market of marketsToRemove) {
                 const supplierManager = this.app.supplierManagers.find(sm => sm.name === market.supplier)!;
                 supplierManager.markets = supplierManager.markets.filter(m => m.id !== market.id);
+                this.app.indexGroupMarket(market, null);
             }
             // Suppression côté group en une seule fois
             groupMarket.markets = groupMarket.markets.filter(

@@ -8,6 +8,7 @@ import {MarketInterface} from "../Interface/MarketInterface";
 export default class Dashboard {
     public app: App;
     public intervalBroadcast: NodeJS.Timeout | null = null;
+    private io: Server | null = null;
 
     constructor(app: App) {
         this.app = app;
@@ -15,27 +16,32 @@ export default class Dashboard {
 
     public async start() {
         const port = process.env.SOCKET_PORT || 4002;
-        const io = new Server(Number(port), {
+        this.io = new Server(Number(port), {
             cors: {
                 origin: "*",  // adjust this for security in production
             }
         });
         console.log(`Dashboard server running on port ${port}`);
 
-        io.on('connection', (socket) => {
+        this.io.on('connection', (socket) => {
             // nothing
         });
 
         this.intervalBroadcast = setInterval(async () => {
-            if (io.sockets.sockets.size === 0) {
+            if (this.io?.sockets.sockets.size === 0) {
                 return;
             }
-            io.sockets.emit('details', await this.getDetails());
+            this.io?.sockets.emit('details', await this.getDetails());
         }, 1_000);
     }
 
     public async stop() {
-        // todo
+        if (this.intervalBroadcast) {
+            clearInterval(this.intervalBroadcast);
+            this.intervalBroadcast = null;
+        }
+        await this.io?.close();
+        this.io = null;
     }
 
     marketToMarketMessage(m: MarketInterface) {

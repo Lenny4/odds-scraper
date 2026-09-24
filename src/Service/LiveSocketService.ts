@@ -24,6 +24,11 @@ export default class LiveSocketService {
         this.app = app;
     }
 
+    public async stop() {
+        await this.io?.close();
+        this.io = undefined;
+    }
+
     public async start() {
         const PORT = Number(process.env.LIVE_PORT) || 4004;
 
@@ -57,6 +62,9 @@ export default class LiveSocketService {
         const groupMarkets: GroupMarketInterface[] = [];
         for (const market of markets) {
             const groupMarket = this.app.getGroupMarket(market.id, market.supplier);
+            if (!groupMarket) {
+                continue;
+            }
             groupMarkets.push(groupMarket);
             const oddRequests: OddRequestInterface[] = [];
             for (const [indexMarketRunner, marketRunner] of market.marketRunners.entries()) {

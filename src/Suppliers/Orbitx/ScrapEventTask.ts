@@ -4,8 +4,13 @@ import DiscordService from "../../Service/DiscordService";
 import OrbitxManager from "./OrbitxManager";
 import {BrowserManager} from "../../Service/BrowserManager";
 import {HTTPResponse, Page} from "puppeteer";
+import {errorToString, sleep} from "../../Service/Utils";
 
 export default class ScrapEventTask {
+    static readonly retryBaseDelay: number = 2_000;
+    static readonly retryMaxDelay: number = 60_000;
+    static readonly alertAfterAttempts: number = 5;
+    static readonly maxAttemptsEventDetails: number = 5;
     orbitxManager: OrbitxManager;
     private isLoginIn: boolean = false;
     private formSelectorOrbitx = 'form.biab_login-form';
@@ -22,7 +27,11 @@ export default class ScrapEventTask {
 
     public constructor(orbitxManager: OrbitxManager) {
         this.orbitxManager = orbitxManager;
-        this.start();
+        this.start().catch((e) => {
+            const message = "ScrapEventTask stopped: " + errorToString(e);
+            console.error(message);
+            DiscordService.send(message);
+        });
     }
 
 
@@ -30,9 +39,15 @@ export default class ScrapEventTask {
         let timeoutBetweenPage = 1_000;
         while (this.orbitxManager.running) {
             for (const sport of this.orbitxManager.sports) {
-                await this.scrapSport(sport.id, timeoutBetweenPage);
+                try {
+                    await this.scrapSport(sport.id, timeoutBetweenPage);
+                } catch (e) {
+                    const message = "scrapSport " + sport.id + " error: " + errorToString(e);
+                    console.error(message);
+                    DiscordService.send(message);
+                    await sleep(timeoutBetweenPage);
+                }
             }
-            this.orbitxManager.app.allMarketScraped = true;
             timeoutBetweenPage = 5_000;
         }
     }
@@ -109,7 +124,7 @@ export default class ScrapEventTask {
     }
 
     private async logOut(page: Page): Promise<void> {
-        await new Promise(resolve => setTimeout(resolve, 1_000));
+        await sleep(1_000);
         try {
             await (await page.waitForSelector("xpath///button[contains(., 'Account')]", {
                 timeout: 1_000
@@ -128,15 +143,17 @@ export default class ScrapEventTask {
         }
         this.isLoginIn = true;
         let pageLogIn: Page | null = null;
-        while (this.needToLoginAgain()) {
+        while (this.needToLoginAgain() && this.orbitxManager.running) {
+            let browserAcquired = false;
             try {
                 const browser = await BrowserManager.acquire(OrbitxManager.cache);
+                browserAcquired = true;
                 pageLogIn = await browser.newPage();
                 this.addListeningHeaders(pageLogIn);
                 let isConnected = false;
                 const errorsMessages: string[] = [];
                 let globalCounter = 0;
-                while (!isConnected) {
+                while (!isConnected && this.orbitxManager.running) {
                     globalCounter++;
                     if (globalCounter === 5) {
                         const message = "Orbitx globalCounter 5 times !";
@@ -197,8 +214,8 @@ export default class ScrapEventTask {
                     }
                 }
                 let connectedUntilCounter = 0;
-                while (this.orbitxManager.connectedUntil === null) {
-                    await new Promise(resolve2 => setTimeout(resolve2, 1_000));
+                while (this.orbitxManager.connectedUntil === null && this.orbitxManager.running) {
+                    await sleep(1_000);
                     connectedUntilCounter++;
                     if (connectedUntilCounter === 20) {
                         const message = "Orbitx connectedUntilCounter 20 times !";
@@ -215,7 +232,11 @@ export default class ScrapEventTask {
                     // nothing
                 }
                 pageLogIn = null;
-                await BrowserManager.release();
+                if (browserAcquired) {
+                    await BrowserManager.release();
+                } else {
+                    await sleep(5_000);
+                }
             }
         }
         this.isLoginIn = false;
@@ -258,47 +279,25 @@ export default class ScrapEventTask {
         let page = 0;
         let totalPage = 0;
         do {
-            let result: any = null;
-            while (result === null) {
-                await this.login();
-                let attempt = 0;
-                let lastStatusCode = 0;
-                if (attempt === 5) {
-                    DiscordService.send(`customer/api/sport/details attempt exceeded lastStatusCode:${lastStatusCode}`)
-                }
-                try {
-                    const body = JSON.stringify({
-                        "contextFilter": "EVENT_TYPE",
-                        "id": sportId,
-                        "timeFilter": "ALL",
-                        "viewBy": "TIME",
-                    });
-                    const response = await fetch(OrbitxManager.url + '/customer/api/sport/details?page=' + page + '&size=20', {
-                        method: "POST",
-                        headers: {
-                            ...this.orbitxManager.headers,
-                            origin: OrbitxManager.url,
-                            "content-length": body.length,
-                            "content-type": "application/json",
-                        },
-                        body: body
-                    });
-                    lastStatusCode = response.status;
-                    if (lastStatusCode !== 200) {
-                        attempt++;
-                        await new Promise(resolve => setTimeout(resolve, 2_000));
-                    } else {
-                        result = await response.json();
-                    }
-                } catch (e) {
-                    attempt++;
-                    if (attempt > 5) {
-                        console.error("customer/api/sport/details attempt exceeded")
-                        throw e;
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 2_000));
-                }
-            }
+            const body = JSON.stringify({
+                "contextFilter": "EVENT_TYPE",
+                "id": sportId,
+                "timeFilter": "ALL",
+                "viewBy": "TIME",
+            });
+            const result = await this.fetchJsonWithRetry(
+                'customer/api/sport/details',
+                OrbitxManager.url + '/customer/api/sport/details?page=' + page + '&size=20',
+                {
+                    method: "POST",
+                    headers: {
+                        "content-length": String(body.length),
+                        "content-type": "application/json",
+                    },
+                    body: body,
+                },
+                Infinity,
+            );
             if (result && result?.marketCatalogueList?.totalPages !== undefined) {
                 totalPage = result.marketCatalogueList.totalPages;
                 page++;
@@ -317,7 +316,7 @@ export default class ScrapEventTask {
                     DiscordService.send("error customer/api/sport/details" + JSON.stringify(result));
                 }
             }
-            await new Promise(resolve => setTimeout(resolve, timeoutBetweenPage)); // to prevent spam
+            await sleep(timeoutBetweenPage); // to prevent spam
         } while (page < totalPage && this.orbitxManager.running);
     }
 
@@ -332,31 +331,54 @@ export default class ScrapEventTask {
     }
 
     private async getAllMarketForEvent(eventId: string): Promise<any[]> {
-        let result: any[] | null = null;
-        while (result === null) {
+        const result = await this.fetchJsonWithRetry(
+            'customer/api/event/details',
+            OrbitxManager.url + '/customer/api/event/details/' + eventId,
+            {
+                method: "GET",
+                headers: {
+                    "content-type": "application/json",
+                },
+            },
+            ScrapEventTask.maxAttemptsEventDetails,
+        );
+        return result?.marketCatalogues ?? [];
+    }
+
+    /**
+     * Fetch an Orbitx API endpoint with login + exponential backoff.
+     * Returns null when maxAttempts is reached (never throws).
+     */
+    private async fetchJsonWithRetry(label: string, url: string, init: RequestInit, maxAttempts: number): Promise<any | null> {
+        let attempt = 0;
+        let lastError = '';
+        while (attempt < maxAttempts && this.orbitxManager.running) {
             await this.login();
-            let attempt = 0;
             try {
-                const response = await fetch(OrbitxManager.url + '/customer/api/event/details/' + eventId, {
-                    method: "GET",
+                const response = await fetch(url, {
+                    ...init,
                     headers: {
                         ...this.orbitxManager.headers,
                         origin: OrbitxManager.url,
-                        "content-type": "application/json",
+                        ...init.headers,
                     },
                 });
                 if (response.status === 200) {
-                    result = (await response.json()).marketCatalogues;
+                    return await response.json();
                 }
+                lastError = 'status ' + response.status;
             } catch (e) {
-                attempt++;
-                if (attempt > 5) {
-                    console.error("customer/api/event/details attempt exceeded")
-                    throw e;
-                }
-                await new Promise(resolve => setTimeout(resolve, 2_000));
+                lastError = errorToString(e);
             }
+            attempt++;
+            if (attempt === ScrapEventTask.alertAfterAttempts) {
+                const message = `${label} failed ${attempt} times, last error: ${lastError}`;
+                console.error(message);
+                DiscordService.send(message);
+            }
+            await sleep(Math.min(ScrapEventTask.retryBaseDelay * 2 ** (attempt - 1), ScrapEventTask.retryMaxDelay));
         }
-        return result;
+        console.error(`${label} giving up after ${attempt} attempts, last error: ${lastError}`);
+        return null;
     }
 }

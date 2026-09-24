@@ -30,6 +30,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     socketMarketId: number = 0;
     socketMarkets: SocketMarketInterface[] = [];
     running: boolean = false;
+    updateInterval: NodeJS.Timeout | null = null;
     sports: PolymarketSportInterface[] = [];
     readonly sportSlugs: string[] = ["nba"];
     public types: TypeMappingInterface[] = [
@@ -51,7 +52,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     async start() {
         this.running = true;
         await this.updateMarkets();
-        setInterval(async () => {
+        this.updateInterval = setInterval(async () => {
             this.updateMarkets();
         }, 3600 * 1000);
     }
@@ -138,7 +139,17 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     async stop() {
-        // todo
+        this.running = false;
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+        for (const socketMarket of this.socketMarkets) {
+            if (socketMarket.pingInterval) clearInterval(socketMarket.pingInterval);
+            if (socketMarket.closeTimeout) clearInterval(socketMarket.closeTimeout);
+            socketMarket.websocket?.close();
+        }
+        await this._removeMarkets(this.markets.map(m => m.id), Date.now());
     }
 
     getStatus(status: string): MarketStatusEnum | null {

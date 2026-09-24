@@ -22,7 +22,10 @@ export class BrowserManager {
         }
 
         if (BrowserManager.launchPromise) {
-            return BrowserManager.launchPromise;
+            return BrowserManager.launchPromise.catch((e) => {
+                BrowserManager.refCount--;
+                throw e;
+            });
         }
 
         // https://peter.sh/experiments/chromium-command-line-switches/
@@ -97,13 +100,18 @@ export class BrowserManager {
             BrowserManager.browser = browser;
             BrowserManager.launchPromise = null;
             return browser;
+        }, (e) => {
+            // allow a new launch on next acquire, and cancel this acquire
+            BrowserManager.launchPromise = null;
+            BrowserManager.refCount--;
+            throw e;
         });
 
         return BrowserManager.launchPromise;
     }
 
     static async release(): Promise<void> {
-        BrowserManager.refCount--;
+        BrowserManager.refCount = Math.max(0, BrowserManager.refCount - 1);
 
         if (BrowserManager.refCount === 0 && BrowserManager.browser) {
             const browserToClose = BrowserManager.browser;
@@ -115,6 +123,13 @@ export class BrowserManager {
 
             await BrowserManager.closePromise;
         }
+    }
+
+    static async closeAll(): Promise<void> {
+        BrowserManager.refCount = 0;
+        const browser = BrowserManager.browser;
+        BrowserManager.browser = null;
+        await browser?.close();
     }
 
     static async addCDPSession(page: Page): Promise<CDPSession> {

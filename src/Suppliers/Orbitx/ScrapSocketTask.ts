@@ -15,6 +15,7 @@ import {
 import DiscordService from "../../Service/DiscordService";
 import {BrowserManager} from "../../Service/BrowserManager";
 import {diff} from "json-diff";
+import {errorToString, sleep} from "../../Service/Utils";
 
 export default class ScrapSocketTask {
     orbitxManager: OrbitxManager;
@@ -25,6 +26,7 @@ export default class ScrapSocketTask {
     waitingSocketMarkets: SocketMarketInterface[] = [];
     id: number = 0;
     isHandlingMarket: boolean = false;
+    refreshInterval: NodeJS.Timeout | null = null;
     needHandleMarket: boolean = false;
     readonly timeoutOpenConnectionMessage: number = 1_000;
     private types: TypeMappingInterface[] = [
@@ -35,14 +37,28 @@ export default class ScrapSocketTask {
 
     public constructor(orbitxManager: OrbitxManager) {
         this.orbitxManager = orbitxManager;
-        this.start();
+        this.start().catch((e) => {
+            const message = "ScrapSocketTask start error: " + errorToString(e);
+            console.error(message);
+            DiscordService.send(message);
+        });
     }
 
     public async start() {
         this.handleMarkets();
-        setInterval(() => {
+        this.refreshInterval = setInterval(() => {
             this.handleMarkets(false, true);
         }, 30 * 1_000)
+    }
+
+    public stop() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+        for (const socketMarket of [...this.orbitxManager.socketMarkets, ...this.waitingSocketMarkets]) {
+            socketMarket.websocket?.close();
+        }
     }
 
     public getExpectedNbWaitingSocketMarkets() {
@@ -62,6 +78,9 @@ export default class ScrapSocketTask {
     }
 
     public async handleMarkets(force: boolean = false, isRefreshSocket = false) {
+        if (!this.orbitxManager.running) {
+            return;
+        }
         if (this.isHandlingMarket && !force) {
             if (!isRefreshSocket) {
                 this.needHandleMarket = true;
@@ -84,59 +103,67 @@ export default class ScrapSocketTask {
         this.isHandlingMarket = false;
     }
 
-    public createWebsocket(browser: Browser, matcher: {
+    public async createWebsocket(browser: Browser, matcher: {
         [Symbol.match](string: string): RegExpMatchArray | null;
     }, socketMarketId: number | undefined = undefined): Promise<WebSocket> {
-        return new Promise(async (resolve) => {
-            let done = false;
-            let page: Page | null = null;
-            let loopCount = 0;
-            while (!done) {
-                loopCount++;
-                if (loopCount === 10) {
-                    DiscordService.send("loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
-                }
-                while (this.orbitxManager.connectedUntil === null) {
-                    await new Promise(resolve2 => setTimeout(resolve2, 1_000));
-                }
-                // region create page
-                if (page !== null) {
-                    await page.close();
-                }
-                let pageCreated = false;
-                while (!pageCreated) {
-                    try {
-                        page = await browser.newPage();
-                        pageCreated = true;
-                    } catch (e) {
-                        await new Promise(resolve2 => setTimeout(resolve2, 1_000));
-                    }
-                }
-                // endregion
-                const cdp = await BrowserManager.addCDPSession(page!);
-                // region register socket handshake
-                cdp!.on('Network.webSocketHandshakeResponseReceived', (event) => {
-                    const r: RegExpMatchArray | null | undefined = event.response.requestHeadersText?.match(matcher);
-                    if (Array.isArray(r) && r.length > 0) {
-                        if (loopCount >= 10) {
-                            DiscordService.send("end loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
-                        }
-                        done = true;
-                        page!.close();
-                        resolve(new WebSocket(r[0], {
-                            headers: event.response.requestHeaders
-                        }));
-                    }
-                });
-                // endregion
-                try {
-                    await page!.goto(OrbitxManager.url);
-                } catch (e: any) {
-                    // nothing
-                }
-                await new Promise(resolve2 => setTimeout(resolve2, OrbitxManager.timeToWaitBeforeWebSocketHandshakeResponseReceived));
+        let loopCount = 0;
+        while (true) {
+            loopCount++;
+            if (!this.orbitxManager.running) {
+                throw new Error("createWebsocket: OrbitxManager stopped");
             }
-        })
+            if (loopCount === 10) {
+                DiscordService.send("loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
+            }
+            while (this.orbitxManager.connectedUntil === null && this.orbitxManager.running) {
+                await sleep(1_000);
+            }
+            let page: Page | null = null;
+            try {
+                page = await this.newPage(browser);
+                const cdp = await BrowserManager.addCDPSession(page);
+                const handshake = new Promise<{ url: string, headers: Record<string, string> }>((resolve) => {
+                    cdp.on('Network.webSocketHandshakeResponseReceived', (event) => {
+                        const r: RegExpMatchArray | null | undefined = event.response.requestHeadersText?.match(matcher);
+                        if (Array.isArray(r) && r.length > 0) {
+                            resolve({url: r[0], headers: event.response.requestHeaders ?? {}});
+                        }
+                    });
+                });
+                const timeout = page.goto(OrbitxManager.url)
+                    .catch(() => {
+                        // nothing
+                    })
+                    .then(() => sleep(OrbitxManager.timeToWaitBeforeWebSocketHandshakeResponseReceived))
+                    .then(() => null);
+                const result = await Promise.race([handshake, timeout]);
+                if (result !== null) {
+                    if (loopCount >= 10) {
+                        DiscordService.send("end loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
+                    }
+                    return new WebSocket(result.url, {
+                        headers: result.headers
+                    });
+                }
+            } catch (e) {
+                console.error("createWebsocket socketMarket[" + socketMarketId + "] error", e);
+                await sleep(1_000);
+            } finally {
+                await page?.close().catch(() => {
+                    // nothing
+                });
+            }
+        }
+    }
+
+    private async newPage(browser: Browser): Promise<Page> {
+        while (true) {
+            try {
+                return await browser.newPage();
+            } catch (e) {
+                await sleep(1_000);
+            }
+        }
     }
 
     private getLogSocketMarketsState() {
@@ -283,13 +310,16 @@ export default class ScrapSocketTask {
         let alreadyAssigned = false;
         if (this.orbitxManager.socketMarkets.length < expectedNbSocketMarkets) {
             const browser = await BrowserManager.acquire(OrbitxManager.cache);
-            for (let i = this.orbitxManager.socketMarkets.length; i < expectedNbSocketMarkets; i++) {
-                const newSocketMarket = await this.createNewSocketMarket(browser);
-                this.orbitxManager.socketMarkets.push(newSocketMarket);
-                this.assignMarketsToSocketMarkets();
-                alreadyAssigned = true;
+            try {
+                for (let i = this.orbitxManager.socketMarkets.length; i < expectedNbSocketMarkets; i++) {
+                    const newSocketMarket = await this.createNewSocketMarket(browser);
+                    this.orbitxManager.socketMarkets.push(newSocketMarket);
+                    this.assignMarketsToSocketMarkets();
+                    alreadyAssigned = true;
+                }
+            } finally {
+                await BrowserManager.release();
             }
-            await BrowserManager.release();
         }
         if (this.orbitxManager.socketMarkets.length > expectedNbSocketMarkets) {
             for (const [index, socketMarket] of this.orbitxManager.socketMarkets.entries()) {
@@ -314,11 +344,14 @@ export default class ScrapSocketTask {
         if (this.getExpectedNbSocketMarkets() === this.orbitxManager.socketMarkets.filter(s => s.canListen).length) { // prioritize socketMarkets
             if (this.waitingSocketMarkets.length < expectedNbWaitingSocketMarkets) {
                 const browser = await BrowserManager.acquire(OrbitxManager.cache);
-                for (let i = this.waitingSocketMarkets.length; i < expectedNbWaitingSocketMarkets; i++) {
-                    const newSocketMarket = await this.createNewSocketMarket(browser);
-                    this.waitingSocketMarkets.push(newSocketMarket);
+                try {
+                    for (let i = this.waitingSocketMarkets.length; i < expectedNbWaitingSocketMarkets; i++) {
+                        const newSocketMarket = await this.createNewSocketMarket(browser);
+                        this.waitingSocketMarkets.push(newSocketMarket);
+                    }
+                } finally {
+                    await BrowserManager.release();
                 }
-                await BrowserManager.release();
             }
         }
         let nbToDelete = this.waitingSocketMarkets.length - expectedNbWaitingSocketMarkets;
@@ -372,24 +405,35 @@ export default class ScrapSocketTask {
         });
         websocket.on('close', () => { // each time error is called -> close is also call
             socketMarket.canListen = false;
+            if (!this.orbitxManager.running) {
+                return;
+            }
             this.switchOnWaitingSocketMarket(socketMarket);
             this.handleMarkets();
         });
         websocket.on('message', (data: Buffer) => {
             const string = data.toString();
             socketMarket.lastReceivedMessage = Date.now();
-            if (string.startsWith('o')) {
-                socketMarket.canListen = true;
-                this.sendListeningMarkets(socketMarket, "on message");
-            } else if (string.startsWith('h')) {
-                // C’est un ping ou un heartbeat (h pour “heartbeat” souvent), pour maintenir la connexion WebSocket ouverte.
-            } else if (string.startsWith('a')) {
-                this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'open');
-                this.updateMarket(JSON.parse(JSON.parse(string.substring(1))))
-            } else {
-                const message = 'Unknown message type websocket: ' + string;
-                DiscordService.send(message)
-                throw message;
+            try {
+                if (string.startsWith('o')) {
+                    socketMarket.canListen = true;
+                    this.sendListeningMarkets(socketMarket, "on message");
+                } else if (string.startsWith('h')) {
+                    // C’est un ping ou un heartbeat (h pour “heartbeat” souvent), pour maintenir la connexion WebSocket ouverte.
+                } else if (string.startsWith('a')) {
+                    this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'open');
+                    this.updateMarket(JSON.parse(JSON.parse(string.substring(1)))).catch((e) => {
+                        console.error("[" + socketMarket.id + "] updateMarket error", e);
+                    });
+                } else {
+                    const message = 'Unknown message type websocket: ' + string;
+                    console.error(message);
+                    DiscordService.send(message);
+                }
+            } catch (e) {
+                const message = "[" + socketMarket.id + "] websocket on message error: " + errorToString(e);
+                console.error(message);
+                DiscordService.send(message);
             }
         });
         return websocket;
@@ -427,8 +471,9 @@ export default class ScrapSocketTask {
                     });
                 }
             }
-            if (market.status !== data.marketDefinition.status) {
-                market.status = this.orbitxManager.getStatus(data.marketDefinition.status);
+            const status = this.orbitxManager.getStatus(data.marketDefinition.status);
+            if (market.status !== status) {
+                market.status = status;
             }
             if (data.marketDefinition.inPlay && market.inPlayTime === null) {
                 market.inPlayTime = now;
@@ -454,7 +499,8 @@ export default class ScrapSocketTask {
                     marketRunner = market.marketRunners.find(mr => mr.runnerId === rc.id);
                 }
                 if (!marketRunner) {
-                    throw "marketRunner not founded";
+                    console.error("marketRunner not found", rc.id, this.orbitxManager.marketToString(market));
+                    continue;
                 }
                 const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
                 for (const type of this.types) {

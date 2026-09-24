@@ -127,7 +127,9 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     }
 
     async stop() {
-        // todo
+        this.running = false;
+        this.scrapSocketTask?.stop();
+        await this._removeMarkets(this.markets.map(m => m.id), Date.now());
     }
 
     canScrapMarket(market: MarketInterface): boolean {

@@ -8,6 +8,7 @@ import {CompetitionEnum} from "./Enum/CompetitionEnum";
 import PolymarketManager from "./Suppliers/Polymarket/PolymarketManager";
 import LiveSocketService from "./Service/LiveSocketService";
 import {SupplierInterface} from "./Interface/SupplierInterface";
+import {BrowserManager} from "./Service/BrowserManager";
 
 export default class App {
     static readonly checkMarketModificationOnLast: number = 5 * 60_000;
@@ -16,8 +17,8 @@ export default class App {
     liveSocketService: LiveSocketService;
     dashboard: Dashboard;
     groupMarketId: number = 0;
-    allMarketScraped: boolean = false;
     groupMarkets: GroupMarketInterface[] = [];
+    private groupMarketByMarket: Map<string, GroupMarketInterface> = new Map();
     competitionMapping: CompetitionMappingInterface[] = [
         {
             enum: CompetitionEnum.Nba,
@@ -43,32 +44,53 @@ export default class App {
         this.supplierManagers = [
             new OrbitxManager(this),
             // new PolymarketManager(this),
-            // new PolymarketBitcoinManager(this),
         ]
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
     }
 
-    getGroupMarket(marketId: number | string, supplier: string) {
-        return this.groupMarkets.find(gm => gm.markets.find(m => m.id === marketId && m.supplier === supplier))!;
+    getGroupMarket(marketId: number | string, supplier: string): GroupMarketInterface | undefined {
+        return this.groupMarketByMarket.get(App.marketKey(marketId, supplier));
+    }
+
+    indexGroupMarket(market: MarketInterface, groupMarket: GroupMarketInterface | null) {
+        const key = App.marketKey(market.id, market.supplier);
+        if (groupMarket) {
+            this.groupMarketByMarket.set(key, groupMarket);
+        } else {
+            this.groupMarketByMarket.delete(key);
+        }
+    }
+
+    static marketKey(marketId: number | string, supplier: string): string {
+        return supplier + ':' + marketId;
     }
 
     afterUpdateMarkets(markets: MarketInterface[]) {
-        const groupMarkets = this.liveSocketService.sendOddsMessage(markets);
+        this.liveSocketService.sendOddsMessage(markets);
     }
 
     async start() {
         await this.mongoService.start();
         for (const manager of this.supplierManagers) {
-            // if (manager.name === PolymarketBitcoinManager.name) {
-            manager.start();
-            // }
+            void manager.start();
         }
-        this.dashboard.start()
-        this.liveSocketService.start()
+        void this.dashboard.start()
+        void this.liveSocketService.start()
     }
 
     async stop() {
-        // todo
+        // stop suppliers first: they save their remaining groupMarkets in Mongo
+        for (const manager of this.supplierManagers) {
+            try {
+                await manager.stop();
+            } catch (e) {
+                console.error("stop " + manager.name, e);
+            }
+        }
+        await this.dashboard.stop();
+        await this.liveSocketService.stop();
+        await BrowserManager.closeAll();
+        await this.mongoService.stop();
     }
 }

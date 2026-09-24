@@ -3,6 +3,10 @@
 import {MarketInterface, OddInterface, TimeValueInterface} from "../Interface/MarketInterface";
 import {MarketMessageInterface, OddRequestInterface} from "../Interface/LiveInterface";
 
+export const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+export const errorToString = (e: unknown): string => e instanceof Error ? (e.stack ?? e.toString()) : String(e);
+
 export const ticks = [
     {from: 0.00, to: 2.00, tick: 0.01},
     {from: 2.00, to: 3.00, tick: 0.02},
@@ -16,9 +20,12 @@ export const ticks = [
     {from: 100.0, to: 1000.0, tick: 10.0}
 ];
 
+/**
+ * Tick used to go UP from oddValue (e.g. 2.00 -> 2.02, 1.99 -> 2.00)
+ */
 export const getTickSize = (oddValue: number): number => {
     for (const range of ticks) {
-        if (oddValue > range.from && oddValue <= range.to) {
+        if (oddValue >= range.from && oddValue < range.to) {
             return range.tick;
         }
     }
@@ -29,7 +36,8 @@ export const getTickDiff = (min: number, max: number): number => {
     let result = 0;
     while (min < max) {
         result++;
-        min += getTickSize(min);
+        // round to the hundredth: all ticks are multiples of 0.01, avoids float drift (1.9 + 10 * 0.01 = 1.9999...)
+        min = Math.round((min + getTickSize(min)) * 100) / 100;
     }
     return result;
 }
