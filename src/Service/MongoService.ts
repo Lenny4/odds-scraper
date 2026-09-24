@@ -9,11 +9,11 @@ import {sleep} from "./Utils";
 export default class MongoService {
     public app: App;
     public orbitxDb: Db | null = null;
-    private client: MongoClient | null = null;
     public connected: boolean = false;
     public marketCollectionName = 'groupMarkets';
     public sofascoreCollectionName = 'sofascore';
     public bitcoinCollectionName = 'bitcoin';
+    private client: MongoClient | null = null;
 
     constructor(app: App) {
         this.app = app;
@@ -27,7 +27,7 @@ export default class MongoService {
         if (this.isEnabled()) {
             await this.initMongoDb();
         } else {
-            console.log("skipping initMongoDb because " + process.env.APP_ENV);
+            console.log(`skipping initMongoDb because ${process.env.APP_ENV}`);
         }
     }
 
@@ -59,10 +59,10 @@ export default class MongoService {
                     attempt === nbAttempt ||
                     !errorMessage.includes('Error: read ECONNRESET')
                 ) {
-                    const message = "collection insertOne " + JSON.stringify({
+                    const message = `collection insertOne ${JSON.stringify({
                         id: groupMarket.id,
                         error: errorMessage,
-                    });
+                    })}`;
                     console.error(message);
                     DiscordService.send(message);
                     break;

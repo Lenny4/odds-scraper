@@ -38,7 +38,7 @@ export default class ScrapSocketTask {
     public constructor(orbitxManager: OrbitxManager) {
         this.orbitxManager = orbitxManager;
         this.start().catch((e) => {
-            const message = "ScrapSocketTask start error: " + errorToString(e);
+            const message = `ScrapSocketTask start error: ${errorToString(e)}`;
             console.error(message);
             DiscordService.send(message);
         });
@@ -94,7 +94,7 @@ export default class ScrapSocketTask {
                 await this.createWaitingSocketMarkets();
                 await this.createMarketSockets();
             } catch (e: any) {
-                const message = "handleMarkets, " + e.toString() + " " + this.getLogSocketMarketsState();
+                const message = `handleMarkets, ${e.toString()} ${this.getLogSocketMarketsState()}`;
                 console.error(message);
                 DiscordService.send(message);
             }
@@ -113,7 +113,7 @@ export default class ScrapSocketTask {
                 throw new Error("createWebsocket: OrbitxManager stopped");
             }
             if (loopCount === 10) {
-                DiscordService.send("loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
+                DiscordService.send(`loopCount = ${loopCount}, socketMarket[${socketMarketId}]`)
             }
             while (this.orbitxManager.connectedUntil === null && this.orbitxManager.running) {
                 await sleep(1_000);
@@ -139,14 +139,14 @@ export default class ScrapSocketTask {
                 const result = await Promise.race([handshake, timeout]);
                 if (result !== null) {
                     if (loopCount >= 10) {
-                        DiscordService.send("end loopCount = " + loopCount + ", socketMarket[" + socketMarketId + "]")
+                        DiscordService.send(`end loopCount = ${loopCount}, socketMarket[${socketMarketId}]`)
                     }
                     return new WebSocket(result.url, {
                         headers: result.headers
                     });
                 }
             } catch (e) {
-                console.error("createWebsocket socketMarket[" + socketMarketId + "] error", e);
+                console.error(`createWebsocket socketMarket[${socketMarketId}] error`, e);
                 await sleep(1_000);
             } finally {
                 await page?.close().catch(() => {
@@ -219,7 +219,7 @@ export default class ScrapSocketTask {
             } else {
                 this.orbitxManager.addConnectionToMarkets([market], 'close', 'could not find getBestSocketMarket');
                 // if (this.orbitxManager.socketMarkets.find(s => s.markets.length < this.maxNbMarketPerSocket)) {
-                //     const message = "getBestSocketMarket socketMarket is undefined " + this.getLogSocketMarketsState();
+                //     const message = `getBestSocketMarket socketMarket is undefined ${this.getLogSocketMarketsState()}`;
                 //     console.error(message);
                 // }
             }
@@ -235,7 +235,7 @@ export default class ScrapSocketTask {
                 }
             } else if (socketMarket.closing) {
                 // const readyState = socketMarket.websocket!.readyState;
-                // console.info("[" + socketMarket.id + "] [" + readyState + "]socketMarket.websocket!.close()", socketMarket.websocket!.readyState);
+                // console.info(`[${socketMarket.id}] [${readyState}]socketMarket.websocket!.close()`, socketMarket.websocket!.readyState);
                 socketMarket.websocket!.close();
                 socketMarketIdsToRemove.push(socketMarket.id);
             }
@@ -254,7 +254,7 @@ export default class ScrapSocketTask {
                     socketMarket.lastReceivedMessage === undefined ||
                     socketMarket.lastReceivedMessage + this.timeoutOpenConnectionMessage < Date.now()
                 ) {
-                    this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'close', "No response from server after sendListeningMarkets for " + this.timeoutOpenConnectionMessage + " ms, from: " + from, this.timeoutOpenConnectionMessage);
+                    this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'close', `No response from server after sendListeningMarkets for ${this.timeoutOpenConnectionMessage} ms, from: ${from}`, this.timeoutOpenConnectionMessage);
                     socketMarket.websocket!.close();
                 }
             }, this.timeoutOpenConnectionMessage);
@@ -391,7 +391,7 @@ export default class ScrapSocketTask {
             socketMarket.open = Date.now();
         });
         websocket.on('error', (e) => {
-            console.error("[" + socketMarket.id + "] websocket on error [" + socketMarket.id + "], try reconnect ...", e);
+            console.error(`[${socketMarket.id}] websocket on error [${socketMarket.id}], try reconnect ...`, e);
             if (e.message == "WebSocket was closed before the connection was established") {
                 return;
             }
@@ -423,15 +423,15 @@ export default class ScrapSocketTask {
                 } else if (string.startsWith('a')) {
                     this.orbitxManager.addConnectionToMarkets(socketMarket.markets, 'open');
                     this.updateMarket(JSON.parse(JSON.parse(string.substring(1)))).catch((e) => {
-                        console.error("[" + socketMarket.id + "] updateMarket error", e);
+                        console.error(`[${socketMarket.id}] updateMarket error`, e);
                     });
                 } else {
-                    const message = 'Unknown message type websocket: ' + string;
+                    const message = `Unknown message type websocket: ${string}`;
                     console.error(message);
                     DiscordService.send(message);
                 }
             } catch (e) {
-                const message = "[" + socketMarket.id + "] websocket on message error: " + errorToString(e);
+                const message = `[${socketMarket.id}] websocket on message error: ${errorToString(e)}`;
                 console.error(message);
                 DiscordService.send(message);
             }
@@ -541,7 +541,7 @@ export default class ScrapSocketTask {
                 const assignedMarkets = this.assignMarketsToSocketMarkets();
                 const notAssignedMarkets = socketMarket.markets.filter(m => !assignedMarkets.includes(m.id));
                 if (notAssignedMarkets.length > 0) {
-                    // const message = "replaceSocketMarket is undefined, " + this.getLogSocketMarketsState();
+                    // const message = `replaceSocketMarket is undefined, ${this.getLogSocketMarketsState()}`;
                     // console.error(message);
                     // DiscordService.send(message);
                     this.orbitxManager.addConnectionToMarkets(notAssignedMarkets, 'close', 'no waitingSocketMarket available');

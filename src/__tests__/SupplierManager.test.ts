@@ -11,10 +11,10 @@ let marketId = 0;
 function apiMarket(runnerNames: string[], startIn: number, overrides: Record<string, any> = {}) {
     marketId++;
     return {
-        event: {id: "e" + marketId, name: runnerNames.join(" v ")},
+        event: {id: `e${marketId}`, name: runnerNames.join(" v ")},
         competition: {id: "c1", name: "Competition"},
         eventType: {id: "1", name: "Soccer"},
-        marketId: "1." + marketId,
+        marketId: `1.${marketId}`,
         marketName: "Match Odds",
         numberOfWinners: 1,
         runners: runnerNames.map((name, i) => ({selectionId: marketId * 10 + i, runnerName: name})),

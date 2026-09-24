@@ -102,7 +102,7 @@ export abstract class SupplierManager {
     }
 
     marketToString(market: MarketInterface, encodeUri: boolean = false): string {
-        return "[" + market.event.competition.sport.name + "-" + market.event.competition.name + "] " + market.event.name + ' ' + this.getMarketUrl(market, encodeUri)
+        return `[${market.event.competition.sport.name}-${market.event.competition.name}] ${market.event.name} ${this.getMarketUrl(market, encodeUri)}`
     }
 
     getMarketIsFinish(market: MarketInterface): boolean {
@@ -210,7 +210,7 @@ export abstract class SupplierManager {
 
     protected _addMarket(market: MarketInterface): void {
         if (process.env.SHOW_LOG_ADD_REMOVE_EVENT === "1") {
-            console.info("Add new market " + this.marketToString(market));
+            console.info(`Add new market ${this.marketToString(market)}`);
         }
         this.markets.push(market);
         const groupMarket = this.addGroupMarket(market);

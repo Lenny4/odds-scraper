@@ -10,12 +10,12 @@ DiscordService.send("odds-scraper started !");
 
 // safety net: log instead of crashing on errors thrown by background tasks / event handlers
 process.on('unhandledRejection', (reason) => {
-    const message = "unhandledRejection: " + errorToString(reason);
+    const message = `unhandledRejection: ${errorToString(reason)}`;
     console.error(message);
     DiscordService.send(message);
 });
 process.on('uncaughtException', (e) => {
-    const message = "uncaughtException: " + errorToString(e);
+    const message = `uncaughtException: ${errorToString(e)}`;
     console.error(message);
     DiscordService.send(message);
 });
@@ -42,6 +42,6 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 app.start().catch((e: any) => {
     console.error(e);
-    DiscordService.send("global catch: " + e.toString());
+    DiscordService.send(`global catch: ${e.toString()}`);
     DiscordService.send(e.stack);
 });

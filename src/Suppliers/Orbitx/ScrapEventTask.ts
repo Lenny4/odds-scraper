@@ -14,9 +14,9 @@ export default class ScrapEventTask {
     orbitxManager: OrbitxManager;
     private isLoginIn: boolean = false;
     private formSelectorOrbitx = 'form.biab_login-form';
-    private S_usernameOrbitx = this.formSelectorOrbitx + ' [placeholder="Username"]';
-    private S_passwordOrbitx = this.formSelectorOrbitx + ' [placeholder="Password"]';
-    private S_loginSubmitOrbitx = this.formSelectorOrbitx + ' [type="submit"]';
+    private S_usernameOrbitx = `${this.formSelectorOrbitx} [placeholder="Username"]`;
+    private S_passwordOrbitx = `${this.formSelectorOrbitx} [placeholder="Password"]`;
+    private S_loginSubmitOrbitx = `${this.formSelectorOrbitx} [type="submit"]`;
     private S_afterLoggingModalOrbitx = [
         '.biab_btn-continue',
         '.biab_tertiary-btn',
@@ -28,7 +28,7 @@ export default class ScrapEventTask {
     public constructor(orbitxManager: OrbitxManager) {
         this.orbitxManager = orbitxManager;
         this.start().catch((e) => {
-            const message = "ScrapEventTask stopped: " + errorToString(e);
+            const message = `ScrapEventTask stopped: ${errorToString(e)}`;
             console.error(message);
             DiscordService.send(message);
         });
@@ -42,7 +42,7 @@ export default class ScrapEventTask {
                 try {
                     await this.scrapSport(sport.id, timeoutBetweenPage);
                 } catch (e) {
-                    const message = "scrapSport " + sport.id + " error: " + errorToString(e);
+                    const message = `scrapSport ${sport.id} error: ${errorToString(e)}`;
                     console.error(message);
                     DiscordService.send(message);
                     await sleep(timeoutBetweenPage);
@@ -261,7 +261,7 @@ export default class ScrapEventTask {
                         const base64Url = token.split('.')[1];
                         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                         const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-                            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                            return `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`;
                         }).join(''));
                         this.orbitxManager.connectedUntil = JSON.parse(jsonPayload).exp;
                         this.orbitxManager.headers = headers;
@@ -287,7 +287,7 @@ export default class ScrapEventTask {
             });
             const result = await this.fetchJsonWithRetry(
                 'customer/api/sport/details',
-                OrbitxManager.url + '/customer/api/sport/details?page=' + page + '&size=20',
+                `${OrbitxManager.url}/customer/api/sport/details?page=${page}&size=20`,
                 {
                     method: "POST",
                     headers: {
@@ -313,7 +313,7 @@ export default class ScrapEventTask {
                     }
                 } else {
                     console.error("error customer/api/sport/details", result);
-                    DiscordService.send("error customer/api/sport/details" + JSON.stringify(result));
+                    DiscordService.send(`error customer/api/sport/details${JSON.stringify(result)}`);
                 }
             }
             await sleep(timeoutBetweenPage); // to prevent spam
@@ -333,7 +333,7 @@ export default class ScrapEventTask {
     private async getAllMarketForEvent(eventId: string): Promise<any[]> {
         const result = await this.fetchJsonWithRetry(
             'customer/api/event/details',
-            OrbitxManager.url + '/customer/api/event/details/' + eventId,
+            `${OrbitxManager.url}/customer/api/event/details/${eventId}`,
             {
                 method: "GET",
                 headers: {
@@ -366,7 +366,7 @@ export default class ScrapEventTask {
                 if (response.status === 200) {
                     return await response.json();
                 }
-                lastError = 'status ' + response.status;
+                lastError = `status ${response.status}`;
             } catch (e) {
                 lastError = errorToString(e);
             }

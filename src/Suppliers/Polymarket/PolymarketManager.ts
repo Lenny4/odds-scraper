@@ -275,7 +275,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     protected async getEvent(eventId: string): Promise<PolymarketEventInterface> {
-        const res = await fetch(PolymarketManager.url + '/events/' + eventId, {
+        const res = await fetch(`${PolymarketManager.url}/events/${eventId}`, {
             method: 'GET',
             headers: {'Content-Type': 'application/json'},
         });
@@ -283,7 +283,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     protected async getSerie(serieId: string | number): Promise<PolymarketSeriesInterface> {
-        const res = await fetch(PolymarketManager.url + '/series/' + serieId, {
+        const res = await fetch(`${PolymarketManager.url}/series/${serieId}`, {
             method: 'GET',
             headers: {'Content-Type': 'application/json'},
         });
@@ -364,9 +364,9 @@ export default class PolymarketManager extends SupplierManager implements Suppli
             const runner = market.runners.find(r => r.id === marketRunner.runnerId)!
             for (const type of this.types) {
                 // @ts-ignore
-                for (let index = 0; (index < initialDump[type.prop + "s"].length && index < 1); index++) {
+                for (let index = 0; (index < initialDump[`${type.prop}s`].length && index < 1); index++) {
                     // @ts-ignore
-                    const prop = initialDump[type.prop + "s"][initialDump[type.prop + "s"].length - index - 1];
+                    const prop = initialDump[`${type.prop}s`][initialDump[`${type.prop}s`].length - index - 1];
 
                     const valueOddValue = Math.round((1 / Number(prop.price)) * 1000);
                     const oddLabel = this.getOddLabel(runner, type.value, index, this.name);
@@ -405,7 +405,7 @@ export default class PolymarketManager extends SupplierManager implements Suppli
     }
 
     private async getSports() {
-        const res = await fetch(PolymarketManager.url + '/sports', {
+        const res = await fetch(`${PolymarketManager.url}/sports`, {
             method: 'GET',
             headers: {'Content-Type': 'application/json'},
         });

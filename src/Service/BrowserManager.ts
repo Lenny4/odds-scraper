@@ -78,7 +78,7 @@ export class BrowserManager {
         };
         if (cache) {
             try {
-                fs.unlinkSync(cache + '/Default/Preferences'); // prevent Chromium to display "Restore Pages?"
+                fs.unlinkSync(`${cache}/Default/Preferences`); // prevent Chromium to display "Restore Pages?"
             } catch (err) {
                 // nothing
             }

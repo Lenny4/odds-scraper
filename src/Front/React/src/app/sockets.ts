@@ -6,7 +6,7 @@ let socketGroupMarkets: Socket | null = null;
 
 function getSocketDetails(): Socket {
     if (!socketDetails) {
-        socketDetails = io("http://" + window.location.hostname + ":4002", {
+        socketDetails = io(`http://${window.location.hostname}:4002`, {
             transports: ["websocket"],
             withCredentials: true,
         });
@@ -16,7 +16,7 @@ function getSocketDetails(): Socket {
 
 function getSocketGroupMarkets(): Socket {
     if (!socketGroupMarkets) {
-        socketGroupMarkets = io("http://" + window.location.hostname + ":4004", {
+        socketGroupMarkets = io(`http://${window.location.hostname}:4004`, {
             transports: ["websocket"],
             withCredentials: true,
         });

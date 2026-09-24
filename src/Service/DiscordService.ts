@@ -17,9 +17,9 @@ export default class DiscordService {
                 },
                 body: JSON.stringify({
                     'username': 'orbitx-scrapper',
-                    'content': (new Date(now!).toLocaleString('fr-FR', {
+                    'content': `${new Date(now!).toLocaleString('fr-FR', {
                         timeStyle: 'long'
-                    }) + " [" + now + "]\n" + message).substring(0, maxLength),
+                    })} [${now}]\n${message}`.substring(0, maxLength),
                 })
             });
         } catch (e) {

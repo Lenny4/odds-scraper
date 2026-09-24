@@ -18,7 +18,6 @@ export default class App {
     dashboard: Dashboard;
     groupMarketId: number = 0;
     groupMarkets: GroupMarketInterface[] = [];
-    private groupMarketByMarket: Map<string, GroupMarketInterface> = new Map();
     competitionMapping: CompetitionMappingInterface[] = [
         {
             enum: CompetitionEnum.Nba,
@@ -38,6 +37,7 @@ export default class App {
         CompetitionEnum.Nba,
         CompetitionEnum.BtcUpdown5m,
     ];
+    private groupMarketByMarket: Map<string, GroupMarketInterface> = new Map();
 
     constructor() {
         this.mongoService = new MongoService(this);
@@ -47,6 +47,10 @@ export default class App {
         ]
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);
+    }
+
+    static marketKey(marketId: number | string, supplier: string): string {
+        return `${supplier}:${marketId}`;
     }
 
     getGroupMarket(marketId: number | string, supplier: string): GroupMarketInterface | undefined {
@@ -60,10 +64,6 @@ export default class App {
         } else {
             this.groupMarketByMarket.delete(key);
         }
-    }
-
-    static marketKey(marketId: number | string, supplier: string): string {
-        return supplier + ':' + marketId;
     }
 
     afterUpdateMarkets(markets: MarketInterface[]) {
@@ -85,7 +85,7 @@ export default class App {
             try {
                 await manager.stop();
             } catch (e) {
-                console.error("stop " + manager.name, e);
+                console.error(`stop ${manager.name}`, e);
             }
         }
         await this.dashboard.stop();
