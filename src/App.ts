@@ -43,7 +43,7 @@ export default class App {
         this.mongoService = new MongoService(this);
         this.supplierManagers = [
             new OrbitxManager(this),
-            // new PolymarketManager(this),
+            new PolymarketManager(this),
         ]
         this.dashboard = new Dashboard(this);
         this.liveSocketService = new LiveSocketService(this);

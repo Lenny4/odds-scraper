@@ -33,7 +33,7 @@ export default class LiveSocketService {
         const httpServer = createServer();
         this.io = new Server(httpServer, {
             cors: {
-                origin: "http://localhost:4001",
+                origin: "*",
                 credentials: true
             }
         });

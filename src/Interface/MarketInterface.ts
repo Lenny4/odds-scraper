@@ -31,6 +31,7 @@ export interface EventInterface {
     id: number | string;
     name: string;
     competition: CompetitionInterface;
+    slug?: string;
 }
 
 export interface DiffMarketInterface {
