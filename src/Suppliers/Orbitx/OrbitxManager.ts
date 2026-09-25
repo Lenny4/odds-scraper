@@ -18,7 +18,6 @@ export default class OrbitxManager extends SupplierManager implements SupplierIn
     name: string = "OrbitxManager";
     markets: MarketInterface[] = [];
     socketMarkets: SocketMarketInterface[] = [];
-    running: boolean = false;
     readonly sports: SportInterface[] = [
         {
             id: "1",

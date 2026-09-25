@@ -19,6 +19,7 @@ export abstract class SupplierManager {
     markets: MarketInterface[] = [];
     name: string = "";
     socketMarkets: SocketMarketInterface[] = [];
+    running: boolean = false;
 
     constructor(app: App) {
         this.app = app;
